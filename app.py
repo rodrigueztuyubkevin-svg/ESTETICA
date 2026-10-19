@@ -166,7 +166,7 @@ def logout():
     return redirect(url_for('index'))
 
 # ------------------------------------------------------------------
-# RUTAS DE TIENDA, CARRITO Y PAGOS
+# RUTAS DE TIENDA Y CARRITO
 # ------------------------------------------------------------------
 
 @app.route('/productos')
@@ -251,8 +251,7 @@ def pagar_carrito():
         flash('Tu carrito está vacío.', 'warning')
         return redirect(url_for('ver_carrito'))
 
-    # Construir lista de items comprados para el pedido
-    detalles_pedido = []
+    productos_pedido = []
     total_pedido = 0.0
 
     for prod_id, cantidad in carrito.items():
@@ -261,14 +260,13 @@ def pagar_carrito():
             if p:
                 subtotal = p['precio'] * cantidad
                 total_pedido += subtotal
-                detalles_pedido.append({
+                productos_pedido.append({
                     "producto_id": str(p['_id']),
                     "nombre": p['nombre'],
                     "precio": p['precio'],
                     "cantidad": cantidad,
                     "subtotal": subtotal
                 })
-                # Descontar stock automáticamente
                 db.productos.update_one(
                     {"_id": ObjectId(prod_id)},
                     {"$inc": {"stock": -cantidad}}
@@ -276,24 +274,23 @@ def pagar_carrito():
         except Exception:
             pass
 
-    # Guardar pedido en MongoDB
     nuevo_pedido = {
         "usuario_id": str(session['usuario_id']),
         "cliente_nombre": session.get('nombre', 'Cliente'),
-        "items": detalles_pedido,
+        "productos": productos_pedido,
         "total": total_pedido,
-        "estado": "pendiente de preparar",
+        "estado": "pendiente de preparación",
         "fecha": datetime.now().strftime('%Y-%m-%d %H:%M')
     }
     db.pedidos.insert_one(nuevo_pedido)
 
     session['carrito'] = {}
     session.modified = True
-    flash('¡Pago procesado con éxito! Tu pedido ha sido enviado al equipo de KAD.', 'success')
+    flash('¡Pago procesado con éxito! Tu pedido ha sido enviado a preparación.', 'success')
     return redirect(url_for('ver_productos'))
 
 # ------------------------------------------------------------------
-# RUTAS DE CLIENTE: PERFIL Y AGENDAMIENTO
+# RUTAS DE CLIENTE
 # ------------------------------------------------------------------
 
 @app.route('/perfil', methods=['GET', 'POST'])
@@ -335,7 +332,6 @@ def perfil():
             srv = db.servicios.find_one({"_id": c.get("servicio_id")})
         except Exception:
             srv = None
-
         c['servicio_nombre'] = srv['nombre'] if srv and 'nombre' in srv else 'Tratamiento Estético'
         c['id'] = str(c['_id'])
         citas.append(c)
@@ -436,7 +432,7 @@ def agendar():
     return render_template('agendar.html', servicios=servicios, especialistas=especialistas, paso=1)
 
 # ------------------------------------------------------------------
-# RUTAS DE ADMINISTRACIÓN (CITAS, SERVICIOS, PRODUCTOS Y PEDIDOS)
+# RUTAS DE ADMINISTRACIÓN
 # ------------------------------------------------------------------
 
 @app.route('/admin')
@@ -444,7 +440,7 @@ def agendar():
 def admin_panel():
     try:
         # Citas
-        citas_raw = list(db.citas.find({}).sort("fecha_hora", 1))
+        citas_raw = list(db.citas.find({}))
         citas = []
         for c in citas_raw:
             u_id = c.get("usuario_id")
@@ -474,28 +470,24 @@ def admin_panel():
             })
 
         # Catálogo de Servicios
-        catalogo_raw = list(db.servicios.find({}).sort([("tipo", 1), ("nombre", 1)]))
+        catalogo_raw = list(db.servicios.find({}))
         catalogo = []
         for cat in catalogo_raw:
             cat['id'] = str(cat['_id'])
             catalogo.append(cat)
 
         # Productos
-        productos_raw = list(db.productos.find({}).sort("nombre", 1))
+        productos_raw = list(db.productos.find({}))
         productos = []
         for p in productos_raw:
             p['id'] = str(p['_id'])
             productos.append(p)
 
-        # Pedidos realizados por clientes
-        pedidos_raw = list(db.pedidos.find({}).sort("fecha", -1))
+        # Pedidos
+        pedidos_raw = list(db.pedidos.find({}))
         pedidos = []
         for ped in pedidos_raw:
             ped['id'] = str(ped['_id'])
-            # Buscar datos del cliente por si acaso
-            u_id = ped.get("usuario_id")
-            cli = db.usuarios.find_one({"_id": ObjectId(u_id)}) if u_id else None
-            ped['cliente_telefono'] = cli.get('telefono', 'No registrado') if cli else 'No registrado'
             pedidos.append(ped)
 
         return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos)
@@ -506,9 +498,9 @@ def admin_panel():
 @app.route('/admin/pedido/estado/<pedido_id>/<estado>')
 @admin_required
 def cambiar_estado_pedido(pedido_id, estado):
-    if estado in ['pendiente de preparar', 'en preparación', 'listo para entregar', 'completado']:
+    if estado in ['pendiente de preparación', 'en camino', 'entregado']:
         db.pedidos.update_one({"_id": ObjectId(pedido_id)}, {"$set": {"estado": estado}})
-        flash(f'El estado del pedido ha sido actualizado a: {estado}.', 'info')
+        flash(f'Estado del pedido actualizado a: {estado}', 'info')
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/servicio/nuevo', methods=['POST'])
@@ -537,7 +529,7 @@ def agregar_servicio():
             "imagen_url": imagen_url if imagen_url else "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80"
         }
         db.servicios.insert_one(nuevo_servicio)
-        flash('Servicio agregado al catálogo correctamente.', 'success')
+        flash('Servicio agregado correctamente.', 'success')
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/servicio/editar/<servicio_id>', methods=['POST'])
@@ -567,9 +559,9 @@ def cambiar_estado_servicio(servicio_id):
         if srv:
             nuevo_estado = 0 if srv.get("activo", 1) == 1 else 1
             db.servicios.update_one({"_id": ObjectId(servicio_id)}, {"$set": {"activo": nuevo_estado}})
-            flash('El estado del servicio ha sido actualizado.', 'info')
+            flash('Estado del servicio actualizado.', 'info')
     except Exception:
-        flash('Error al actualizar el servicio.', 'danger')
+        pass
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/producto/nuevo', methods=['POST'])
@@ -594,7 +586,7 @@ def agregar_producto():
             "imagen_url": imagen_url if imagen_url else "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=600&q=80"
         }
         db.productos.insert_one(nuevo_prod)
-        flash('Producto agregado con éxito al catálogo.', 'success')
+        flash('Producto agregado con éxito.', 'success')
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/producto/editar/<producto_id>', methods=['POST'])
@@ -630,11 +622,8 @@ def cambiar_estado_producto(producto_id):
 @admin_required
 def cambiar_estado_cita(cita_id, estado):
     if estado in ['confirmada', 'cancelada', 'completada']:
-        try:
-            db.citas.update_one({"_id": ObjectId(cita_id)}, {"$set": {"estado": estado}})
-            flash(f'La cita ha sido marcada como {estado}.', 'info')
-        except Exception:
-            flash('No se pudo actualizar la cita.', 'danger')
+        db.citas.update_one({"_id": ObjectId(cita_id)}, {"$set": {"estado": estado}})
+        flash(f'La cita ha sido marcada como {estado}.', 'info')
     return redirect(url_for('admin_panel'))
 
 if __name__ == '__main__':
