@@ -1,145 +1,35 @@
-from flask import Flask, g
-import sqlite3
 import os
+from datetime import date
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+from pymongo import MongoClient
+from bson.objectid import ObjectId
 
 app = Flask(__name__)
 app.secret_key = 'aura_estetica_secret_key_super_segura'
-DATABASE = 'database.db'
-
-def get_db():
-    """Conexión a la base de datos SQLite por petición."""
-    if 'db' not in g:
-        g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row
-    return g.db
-
-@app.teardown_appcontext
-def close_db(exception):
-    """Cierra la conexión al finalizar la petición."""
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
-
-app = Flask(__name__)
-app.secret_key = 'aura_estetica_secret_key_super_segura'
-DATABASE = 'database.db'
 
 # ------------------------------------------------------------------
-# CONFIGURACIÓN Y MANEJO DE LA BASE DE DATOS
+# CONFIGURACIÓN DE MONGODB ATLAS
 # ------------------------------------------------------------------
+mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/estetica_db")
+client = MongoClient(mongo_uri)
+db = client.get_database("lumina_studio_db")
 
-def get_db():
-    """Conexión a la base de datos SQLite por petición."""
-    if 'db' not in g:
-        g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row
-    return g.db
-
-@app.teardown_appcontext
-def close_db(exception):
-    """Cierra la conexión al finalizar la petición."""
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
-
+# Inicializar servicios por defecto si la colección está vacía
 def init_db():
-    """Inicializa la estructura de las tablas en SQLite y datos por defecto."""
-    with app.app_context():
-        db = get_db()
-        cursor = db.cursor()
+    if db.servicios.count_documents({}) == 0:
+        servicios_iniciales = [
+            {'nombre': 'Limpieza Facial Profunda', 'descripcion': 'Tratamiento purificante con exfoliación, extracción e hidratación intensiva para renovar tu piel.', 'precio': 650.00, 'duracion_min': 60, 'tipo': 'servicio', 'activo': 1},
+            {'nombre': 'Masaje Relajante Corporal', 'descripcion': 'Terapia corporal con aceites esenciales diseñada para liberar tensión muscular y reducir el estrés.', 'precio': 800.00, 'duracion_min': 50, 'tipo': 'servicio', 'activo': 1},
+            {'nombre': 'Manicura & Pedicura Spa', 'descripcion': 'Cuidado completo de uñas con exfoliación orgánica, tratamiento de cutículas y esmaltado duradero.', 'precio': 550.00, 'duracion_min': 75, 'tipo': 'servicio', 'activo': 1},
+            {'nombre': 'Lifting y Tinte de Pestañas', 'descripcion': 'Realce natural de tus pestañas desde la raíz con nutrición de queratina para una mirada definida.', 'precio': 450.00, 'duracion_min': 45, 'tipo': 'servicio', 'activo': 1}
+        ]
+        db.servicios.insert_many(servicios_iniciales)
 
-        # Tabla Usuarios
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                telefono TEXT,
-                password TEXT NOT NULL,
-                rol TEXT DEFAULT 'cliente'
-            )
-        ''')
-
-        # Tabla Categorías
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS categorias (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT NOT NULL
-            )
-        ''')
-
-        # Tabla Servicios / Productos (Catálogo)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS servicios (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                categoria_id INTEGER,
-                nombre TEXT NOT NULL,
-                descripcion TEXT,
-                precio REAL NOT NULL,
-                duracion_min INTEGER,
-                tipo TEXT DEFAULT 'servicio',
-                activo INTEGER DEFAULT 1,
-                FOREIGN KEY (categoria_id) REFERENCES categorias(id)
-            )
-        ''')
-
-        # Tabla Especialistas / Esteticistas
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS especialistas (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT NOT NULL,
-                especialidad TEXT
-            )
-        ''')
-
-        # Tabla Ficha de Salud
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS fichas_salud (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                usuario_id INTEGER UNIQUE NOT NULL,
-                alergias TEXT,
-                condiciones_piel TEXT,
-                padecimientos_especiales TEXT,
-                embarazo_lactancia INTEGER DEFAULT 0,
-                cita_silenciosa INTEGER DEFAULT 0,
-                notas_adicionales TEXT,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-            )
-        ''')
-
-        # Tabla Citas
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS citas (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                usuario_id INTEGER NOT NULL,
-                servicio_id INTEGER NOT NULL,
-                especialista_id INTEGER,
-                fecha_hora TEXT NOT NULL,
-                estado TEXT DEFAULT 'pendiente',
-                notas_cliente TEXT,
-                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-                FOREIGN KEY (servicio_id) REFERENCES servicios(id),
-                FOREIGN KEY (especialista_id) REFERENCES especialistas(id)
-            )
-        ''')
-
-        db.commit()
-
-        # Insertar servicios iniciales si la tabla está vacía
-        cursor.execute('SELECT COUNT(*) FROM servicios')
-        if cursor.fetchone()[0] == 0:
-            servicios_iniciales = [
-                ('Limpieza Facial Profunda', 'Tratamiento purificante con exfoliación, extracción e hidratación intensiva para renovar tu piel.', 650.00, 60, 'servicio', 1),
-                ('Masaje Relajante Corporal', 'Terapia corporal con aceites esenciales diseñada para liberar tensión muscular y reducir el estrés.', 800.00, 50, 'servicio', 1),
-                ('Manicura & Pedicura Spa', 'Cuidado completo de uñas con exfoliación orgánica, tratamiento de cutículas y esmaltado duradero.', 550.00, 75, 'servicio', 1),
-                ('Lifting y Tinte de Pestañas', 'Realce natural de tus pestañas desde la raíz con nutrición de queratina para una mirada definida.', 450.00, 45, 'servicio', 1)
-            ]
-            cursor.executemany('''
-                INSERT INTO servicios (nombre, descripcion, precio, duracion_min, tipo, activo)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', servicios_iniciales)
-            db.commit()
+# Ejecutar inicialización al arrancar
+with app.app_context():
+    init_db()
 
 # ------------------------------------------------------------------
 # DECORADORES DE AUTENTICACIÓN
@@ -169,9 +59,7 @@ def admin_required(f):
 
 @app.route('/')
 def index():
-    """Página de inicio con servicios destacados."""
-    db = get_db()
-    servicios = db.execute('SELECT * FROM servicios WHERE activo = 1 AND tipo = "servicio" LIMIT 6').fetchall()
+    servicios = list(db.servicios.find({"activo": 1, "tipo": "servicio"}).limit(6))
     return render_template('index.html', servicios=servicios)
 
 @app.route('/registro', methods=['GET', 'POST'])
@@ -182,25 +70,24 @@ def registro():
         telefono = request.form['telefono']
         password = generate_password_hash(request.form['password'])
 
-        db = get_db()
-        try:
-            cursor = db.cursor()
-            cursor.execute(
-                'INSERT INTO usuarios (nombre, email, telefono, password) VALUES (?, ?, ?, ?)',
-                (nombre, email, telefono, password)
-            )
-            db.commit()
-           
-            nuevo_usuario_id = cursor.lastrowid
-            session['usuario_id'] = nuevo_usuario_id
+        if db.usuarios.find_one({"email": email}):
+            flash('El correo electrónico ya está registrado.', 'danger')
+        else:
+            nuevo_usuario = {
+                "nombre": nombre,
+                "email": email,
+                "telefono": telefono,
+                "password": password,
+                "rol": "cliente"
+            }
+            resultado = db.usuarios.insert_one(nuevo_usuario)
+            
+            session['usuario_id'] = str(resultado.inserted_id)
             session['nombre'] = nombre
             session['rol'] = 'cliente'
 
             flash(f'¡Bienvenido/a, {nombre}! Tu cuenta se ha creado con éxito.', 'success')
             return redirect(url_for('index'))
-           
-        except sqlite3.IntegrityError:
-            flash('El correo electrónico ya está registrado.', 'danger')
 
     return render_template('registro.html')
 
@@ -210,16 +97,15 @@ def login():
         email = request.form['email']
         password = request.form['password']
 
-        db = get_db()
-        usuario = db.execute('SELECT * FROM usuarios WHERE email = ?', (email,)).fetchone()
+        usuario = db.usuarios.find_one({"email": email})
 
         if usuario and check_password_hash(usuario['password'], password):
-            session['usuario_id'] = usuario['id']
+            session['usuario_id'] = str(usuario['_id'])
             session['nombre'] = usuario['nombre']
-            session['rol'] = usuario['rol']
+            session['rol'] = usuario.get('rol', 'cliente')
             flash(f'¡Bienvenido de nuevo, {usuario["nombre"]}!', 'success')
-           
-            if usuario['rol'] == 'admin':
+            
+            if usuario.get('rol') == 'admin':
                 return redirect(url_for('admin_panel'))
             return redirect(url_for('perfil'))
         else:
@@ -240,10 +126,8 @@ def logout():
 @app.route('/perfil', methods=['GET', 'POST'])
 @login_required
 def perfil():
-    db = get_db()
     usuario_id = session['usuario_id']
 
-    # Procesar guardado/actualización de la Ficha de Salud
     if request.method == 'POST':
         alergias = request.form.get('alergias', '')
         condiciones_piel = request.form.get('condiciones_piel', '')
@@ -252,54 +136,52 @@ def perfil():
         silenciosa = 1 if request.form.get('cita_silenciosa') else 0
         notas = request.form.get('notas_adicionales', '')
 
-        db.execute('''
-            INSERT INTO fichas_salud
-                (usuario_id, alergias, condiciones_piel, padecimientos_especiales, embarazo_lactancia, cita_silenciosa, notas_adicionales)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(usuario_id) DO UPDATE SET
-                alergias = excluded.alergias,
-                condiciones_piel = excluded.condiciones_piel,
-                padecimientos_especiales = excluded.padecimientos_especiales,
-                embarazo_lactancia = excluded.embarazo_lactancia,
-                cita_silenciosa = excluded.cita_silenciosa,
-                notas_adicionales = excluded.notas_adicionales
-        ''', (usuario_id, alergias, condiciones_piel, padecimientos, embarazo, silenciosa, notas))
-       
-        db.commit()
+        ficha_data = {
+            "usuario_id": usuario_id,
+            "alergias": alergias,
+            "condiciones_piel": condiciones_piel,
+            "padecimientos_especiales": padecimientos,
+            "embarazo_lactancia": embarazo,
+            "cita_silenciosa": silenciosa,
+            "notas_adicionales": notas
+        }
+
+        db.fichas_salud.update_one(
+            {"usuario_id": usuario_id},
+            {"$set": ficha_data},
+            upsert=True
+        )
+        
         flash('Tu ficha de salud se ha actualizado correctamente.', 'success')
         return redirect(url_for('perfil'))
 
-    # Obtener Ficha de Salud actual (Manejo robusto para índices o diccionarios)
-    ficha = db.execute('SELECT * FROM fichas_salud WHERE usuario_id = ?', (usuario_id,)).fetchone()
+    ficha = db.fichas_salud.find_one({"usuario_id": usuario_id})
+    
+    # Obtener citas y hacer el cruce (join manual) con servicios y especialistas
+    citas_raw = list(db.citas.find({"usuario_id": usuario_id}).sort("fecha_hora", -1))
+    citas = []
+    for c in citas_raw:
+        srv = db.servicios.find_one({"_id": c.get("servicio_id")})
+        esp = db.especialistas.find_one({"_id": c.get("especialista_id")}) if c.get("especialista_id") else None
+        
+        c['servicio_nombre'] = srv['nombre'] if srv else 'Servicio'
+        c['especialista_nombre'] = esp['nombre'] if esp else 'General'
+        c['id'] = str(c['_id'])
+        citas.append(c)
 
-    # Obtener Citas Agendadas del usuario
-    citas = db.execute('''
-        SELECT c.*, s.nombre AS servicio_nombre, e.nombre AS especialista_nombre
-        FROM citas c
-        JOIN servicios s ON c.servicio_id = s.id
-        LEFT JOIN especialistas e ON c.especialista_id = e.id
-        WHERE c.usuario_id = ?
-        ORDER BY c.fecha_hora DESC
-    ''', (usuario_id,)).fetchall()
-
-    # Obtener datos de usuario
-    usuario_info = db.execute('SELECT nombre, email, telefono FROM usuarios WHERE id = ?', (usuario_id,)).fetchone()
+    usuario_info = db.usuarios.find_one({"_id": ObjectId(usuario_id)})
 
     return render_template('perfil.html', usuario=usuario_info, ficha_medica=ficha, citas=citas)
-
 
 @app.route('/agendar', methods=['GET', 'POST'])
 @login_required
 def agendar():
-    db = get_db()
-    
-    servicios = db.execute('SELECT * FROM servicios WHERE activo = 1 AND tipo = "servicio"').fetchall()
-    especialistas = db.execute('SELECT * FROM especialistas').fetchall()
+    servicios = list(db.servicios.find({"activo": 1, "tipo": "servicio"}))
+    especialistas = list(db.especialistas.find({}))
 
     if request.method == 'POST':
         paso = request.form.get('paso', '1')
         
-        # PASO 1: Selección de Servicio -> Avanza a Paso 2
         if paso == '1':
             servicio_id = request.form.get('servicio_id')
             if not servicio_id:
@@ -307,15 +189,12 @@ def agendar():
                 return redirect(url_for('agendar'))
             return render_template('agendar.html', paso=2, servicio_id=servicio_id, servicios=servicios, especialistas=especialistas)
         
-        # PASO 2: Selección de Especialista -> Avanza a Paso 3
         elif paso == '2':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id', '0')
-            from datetime import date
             hoy = date.today().strftime('%Y-%m-%d')
             return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, hoy=hoy, servicios=servicios, especialistas=especialistas)
         
-        # PASO 3: Selección de Fecha y Hora -> Avanza a Paso 4 (Resumen)
         elif paso == '3':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id')
@@ -326,11 +205,9 @@ def agendar():
                 flash('Por favor selecciona una fecha y hora válidas.', 'warning')
                 return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, servicios=servicios, especialistas=especialistas)
             
-            srv = db.execute('SELECT * FROM servicios WHERE id = ?', (servicio_id,)).fetchone()
-            
+            srv = db.servicios.find_one({"_id": ObjectId(servicio_id)})
             return render_template('agendar.html', paso=4, servicio_id=servicio_id, especialista_id=especialista_id, fecha=fecha, hora=hora, servicio_info=srv, servicios=servicios, especialistas=especialistas)
 
-        # PASO 4: Confirmación Final y Guardado en Base de Datos
         elif paso == '4':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id')
@@ -339,14 +216,17 @@ def agendar():
             notas = request.form.get('notas', '')
 
             fecha_hora = f"{fecha} {hora}"
-            especialista_val = int(especialista_id) if especialista_id and especialista_id != '0' else None
-
-            db.execute('''
-                INSERT INTO citas (usuario_id, servicio_id, especialista_id, fecha_hora, notas_cliente, estado)
-                VALUES (?, ?, ?, ?, ?, 'confirmada')
-            ''', (session['usuario_id'], servicio_id, especialista_val, fecha_hora, notas))
             
-            db.commit()
+            nueva_cita = {
+                "usuario_id": session['usuario_id'],
+                "servicio_id": ObjectId(servicio_id),
+                "especialista_id": ObjectId(especialista_id) if especialista_id and especialista_id != '0' else None,
+                "fecha_hora": fecha_hora,
+                "notas_cliente": notas,
+                "estado": "confirmada"
+            }
+
+            db.citas.insert_one(nueva_cita)
             flash('¡Tu cita ha sido reservada con éxito!', 'success')
             return redirect(url_for('perfil'))
 
@@ -359,38 +239,35 @@ def agendar():
 @app.route('/admin')
 @admin_required
 def admin_panel():
-    db = get_db()
+    citas_raw = list(db.citas.find({}).sort("fecha_hora", 1))
+    citas = []
+    for c in citas_raw:
+        u = db.usuarios.find_one({"_id": ObjectId(c["usuario_id"])})
+        s = db.servicios.find_one({"_id": c["servicio_id"]})
+        f = db.fichas_salud.find_one({"usuario_id": c["usuario_id"]})
+        
+        tiene_ficha = 1 if f and (f.get("alergias") or f.get("condiciones_piel") or f.get("embarazo_lactancia") == 1) else 0
 
-    citas_query = '''
-        SELECT
-            c.id, c.fecha_hora, c.estado, c.notas_cliente,
-            u.nombre AS cliente_nombre, u.telefono,
-            s.nombre AS servicio_nombre,
-            CASE WHEN f.id IS NOT NULL AND (
-                (f.alergias IS NOT NULL AND f.alergias != '') OR
-                (f.condiciones_piel IS NOT NULL AND f.condiciones_piel != '') OR
-                f.embarazo_lactancia = 1
-            ) THEN 1 ELSE 0 END AS tiene_ficha
-        FROM citas c
-        JOIN usuarios u ON c.usuario_id = u.id
-        JOIN servicios s ON c.servicio_id = s.id
-        LEFT JOIN fichas_salud f ON u.id = f.usuario_id
-        ORDER BY c.fecha_hora ASC
-    '''
-    citas = db.execute(citas_query).fetchall()
-    catalogo = db.execute('SELECT * FROM servicios ORDER BY tipo, nombre').fetchall()
+        citas.append({
+            "id": str(c["_id"]),
+            "fecha_hora": c["fecha_hora"],
+            "estado": c.get("estado", "pendiente"),
+            "notas_cliente": c.get("notas_cliente", ""),
+            "cliente_nombre": u["nombre"] if u else "Desconocido",
+            "telefono": u.get("telefono", "") if u else "",
+            "servicio_nombre": s["nombre"] if s else "Servicio",
+            "tiene_ficha": tiene_ficha
+        })
 
+    catalogo = list(db.servicios.find({}).sort([("tipo", 1), ("nombre", 1)]))
     return render_template('admin.html', citas=citas, catalogo=catalogo)
 
-
-@app.route('/admin/cita/<int:cita_id>/<estado>')
+@app.route('/admin/cita/<cita_id>/<estado>')
 @admin_required
 def cambiar_estado_cita(cita_id, estado):
     if estado in ['confirmada', 'cancelada', 'completada']:
-        db = get_db()
-        db.execute('UPDATE citas SET estado = ? WHERE id = ?', (estado, cita_id))
-        db.commit()
-        flash(f'La cita #{cita_id} ha sido marcada como {estado}.', 'info')
+        db.citas.update_one({"_id": ObjectId(cita_id)}, {"$set": {"estado": estado}})
+        flash(f'La cita ha sido marcada como {estado}.', 'info')
     return redirect(url_for('admin_panel'))
 
 # ------------------------------------------------------------------
@@ -398,5 +275,4 @@ def cambiar_estado_cita(cita_id, estado):
 # ------------------------------------------------------------------
 
 if __name__ == '__main__':
-    init_db()
     app.run(debug=True)
