@@ -17,7 +17,7 @@ client = MongoClient(mongo_uri)
 db = client.get_database("lumina_studio_db")
 
 def init_db():
-    """Asegura que los servicios iniciales existan en MongoDB si la colección está vacía."""
+    """Inicializa la colección de servicios en MongoDB si está vacía."""
     if db.servicios.count_documents({}) == 0:
         servicios_iniciales = [
             {
@@ -158,7 +158,7 @@ def logout():
 def perfil():
     usuario_id = str(session['usuario_id'])
 
-    # Procesar guardado o actualización de la Ficha Médica
+    # Guardar Ficha Médica
     if request.method == 'POST':
         alergias = request.form.get('alergias', '')
         condiciones_piel = request.form.get('condiciones_piel', '')
@@ -185,10 +185,10 @@ def perfil():
         flash('Tu ficha médica y preferencias se han guardado con éxito.', 'success')
         return redirect(url_for('perfil'))
 
-    # Obtener Ficha Médica actual
+    # Obtener Ficha Médica
     ficha = db.fichas_salud.find_one({"usuario_id": usuario_id})
     
-    # Obtener Citas Agendadas
+    # Obtener Citas
     citas_raw = list(db.citas.find({"usuario_id": usuario_id}).sort("fecha_hora", -1))
     citas = []
     for c in citas_raw:
@@ -200,7 +200,7 @@ def perfil():
         c['id'] = str(c['_id'])
         citas.append(c)
 
-    # Obtener Información del Usuario
+    # Obtener información del usuario
     try:
         obj_id = ObjectId(usuario_id)
     except Exception:
@@ -228,7 +228,7 @@ def agendar():
     if request.method == 'POST':
         paso = request.form.get('paso', '1')
         
-        # PASO 1: Selección de Servicio
+        # PASO 1
         if paso == '1':
             servicio_id = request.form.get('servicio_id')
             if not servicio_id:
@@ -236,14 +236,14 @@ def agendar():
                 return render_template('agendar.html', paso=1, servicios=servicios, especialistas=especialistas)
             return render_template('agendar.html', paso=2, servicio_id=servicio_id, servicios=servicios, especialistas=especialistas)
         
-        # PASO 2: Selección de Especialista
+        # PASO 2
         elif paso == '2':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id', '0')
             hoy = date.today().strftime('%Y-%m-%d')
             return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, hoy=hoy, servicios=servicios, especialistas=especialistas)
         
-        # PASO 3: Selección de Fecha y Hora
+        # PASO 3
         elif paso == '3':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id')
@@ -265,7 +265,7 @@ def agendar():
 
             return render_template('agendar.html', paso=4, servicio_id=servicio_id, especialista_id=especialista_id, fecha=fecha, hora=hora, servicio_info=srv, servicios=servicios, especialistas=especialistas)
 
-        # PASO 4: Confirmación Final y Guardado
+        # PASO 4
         elif paso == '4':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id')
@@ -348,10 +348,6 @@ def cambiar_estado_cita(cita_id, estado):
         db.citas.update_one({"_id": ObjectId(cita_id)}, {"$set": {"estado": estado}})
         flash(f'La cita ha sido marcada como {estado}.', 'info')
     return redirect(url_for('admin_panel'))
-
-# ------------------------------------------------------------------
-# INICIALIZACIÓN DE LA APLICACIÓN
-# ------------------------------------------------------------------
 
 if __name__ == '__main__':
     app.run(debug=True)
