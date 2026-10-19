@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Panel de Administración - Aura Estética{% endblock %}
+
+{% block content %}
+<section class="admin-container fade-in-up">
+    <!-- Encabezado Admin -->
+    <div class="admin-header">
+        <div>
+            <h2>Panel de Administración</h2>
+            <p>Control de citas, alertas médicas y catálogo de servicios</p>
+        </div>
+        <a href="{{ url_for('index') }}" class="btn-secondary btn-sm"><i class="fa-solid fa-globe"></i> Ver Sitio Público</a>
+    </div>
+
+    <!-- Sección 1: Gestión de Citas Próximas con Alertas de Salud -->
+    <div class="admin-card">
+        <div class="card-title-box">
+            <i class="fa-regular fa-calendar-days icon"></i>
+            <h3>Citas Próximas y Alertas</h3>
+        </div>
+
+        {% if citas %}
+            <div class="table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Servicio</th>
+                            <th>Fecha y Hora</th>
+                            <th>Ficha Médica</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cita in citas %}
+                        <tr>
+                            <td>
+                                <strong>{{ cita.cliente_nombre }}</strong><br>
+                                <small class="text-subtle">{{ cita.telefono or 'Sin teléfono' }}</small>
+                            </td>
+                            <td>{{ cita.servicio_nombre }}</td>
+                            <td>{{ cita.fecha_hora }}</td>
+                            <td>
+                                {% if cita.tiene_ficha %}
+                                    <span class="badge badge-health-alert"><i class="fa-solid fa-triangle-exclamation"></i> Ver Ficha</span>
+                                {% else %}
+                                    <span class="badge badge-subtle">Sin ficha</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ cita.estado }}">{{ cita.estado|capitalize }}</span>
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-action confirm" title="Confirmar"><i class="fa-solid fa-check"></i></button>
+                                    <button class="btn-action cancel" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <p>No hay citas programadas por el momento.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Sección 2: Gestión Rápida del Catálogo -->
+    <div class="admin-card margin-top-card">
+        <div class="card-title-box flex-between">
+            <div class="flex-align">
+                <i class="fa-solid fa-pump-soap icon"></i>
+                <h3>Gestión del Catálogo</h3>
+            </div>
+            <button class="btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Agregar Servicio / Producto</button>
+        </div>
+
+        <div class="table-responsive margin-top">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Tipo</th>
+                        <th>Precio</th>
+                        <th>Duración</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Manicura Rusa + Gelish</td>
+                        <td><span class="badge badge-subtle">Servicio</span></td>
+                        <td>$45.00</td>
+                        <td>60 min</td>
+                        <td><span class="badge badge-confirmada">Activo</span></td>
+                    </tr>
+                    <tr>
+                        <td>Sérum Facial Hidratante</td>
+                        <td><span class="badge badge-subtle">Producto</span></td>
+                        <td>$32.00</td>
+                        <td>-</td>
+                        <td><span class="badge badge-confirmada">Activo</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}

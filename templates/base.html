@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Lumina Studio{% endblock %}</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Estilos CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+    <!-- Navegación -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}" class="nav-brand">
+                <i class="fa-solid fa-sparkles brand-icon"></i> Lumina Studio
+            </a>
+
+            <button class="nav-toggle" id="navToggle" aria-label="Abrir menú">
+                <span class="hamburger"></span>
+            </button>
+
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="{{ url_for('index') }}" class="nav-link"><i class="fa-solid fa-house"></i> Inicio</a></li>
+                <li><a href="{{ url_for('index') }}#servicios" class="nav-link"><i class="fa-solid fa-list-check"></i> Servicios</a></li>
+                
+                {% if session.get('usuario_id') %}
+                    <li><a href="{{ url_for('agendar') }}" class="nav-link btn-nav-highlight"><i class="fa-regular fa-calendar-check"></i> Agendar Cita</a></li>
+                    <li><a href="{{ url_for('perfil') }}" class="nav-link"><i class="fa-regular fa-user"></i> Mi Perfil</a></li>
+                    
+                    {% if session.get('rol') == 'admin' %}
+                        <li><a href="{{ url_for('admin_panel') }}" class="nav-link admin-badge"><i class="fa-solid fa-sliders"></i> Panel Admin</a></li>
+                    {% endif %}
+                    
+                    <li><a href="{{ url_for('logout') }}" class="nav-link nav-logout"><i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión</a></li>
+                {% else %}
+                    <li><a href="{{ url_for('login') }}" class="nav-link"><i class="fa-solid fa-arrow-right-to-bracket"></i> Iniciar Sesión</a></li>
+                    <li><a href="{{ url_for('registro') }}" class="btn-primary btn-sm"><i class="fa-solid fa-user-plus"></i> Registrarse</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Mensajes Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages-container">
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">
+                        <span class="flash-text">{{ message }}</span>
+                        <button class="flash-close" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Contenido Principal -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Modal para Ficha Médica -->
+    {% if session.get('usuario_id') and session.get('rol') == 'cliente' %}
+    <div class="modal-overlay" id="healthModalOverlay">
+        <div class="modal-card">
+            <i class="fa-solid fa-notes-medical modal-icon"></i>
+            <h3>Bienvenido/a a tu espacio</h3>
+            <p>Para brindarte una experiencia más personalizada y segura en tus tratamientos, puedes completar tu ficha médica cuando lo desees.</p>
+            
+            <div class="modal-actions">
+                <a href="{{ url_for('perfil') }}" class="btn-primary btn-full"><i class="fa-solid fa-pen-to-square"></i> Completar Ficha Ahora</a>
+                <button type="button" class="btn-secondary btn-full" onclick="closeHealthNotice()"><i class="fa-solid fa-xmark"></i> Omitir por ahora</button>
+            </div>
+
+            <label class="modal-dont-show">
+                <input type="checkbox" id="dontShowCheckbox">
+                <span>No volver a mostrar esta recomendación</span>
+            </label>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Pie de Página -->
+    <footer class="footer">
+        <div class="footer-container">
+            <p>&copy; 2026 Lumina Studio. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <script>
+        const navToggle = document.getElementById('navToggle');
+        const navMenu = document.getElementById('navMenu');
+
+        if (navToggle) {
+            navToggle.addEventListener('click', () => {
+                navMenu.classList.toggle('active');
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const healthModalOverlay = document.getElementById("healthModalOverlay");
+            if (healthModalOverlay) {
+                const hideNotice = localStorage.getItem("hideHealthNotice");
+                if (!hideNotice) {
+                    setTimeout(() => {
+                        healthModalOverlay.classList.add("active");
+                    }, 400);
+                }
+            }
+        });
+
+        function closeHealthNotice() {
+            const checkbox = document.getElementById("dontShowCheckbox");
+            const healthModalOverlay = document.getElementById("healthModalOverlay");
+            if (checkbox && checkbox.checked) {
+                localStorage.setItem("hideHealthNotice", "true");
+            }
+            if (healthModalOverlay) {
+                healthModalOverlay.classList.remove("active");
+            }
+        }
+    </script>
+</body>
+</html>

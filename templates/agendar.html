@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block title %}Agendar Cita - Lumina Studio{% endblock %}
+
+{% block content %}
+<div class="booking-container">
+    <div class="booking-header">
+        <h1>Reserva tu Experiencia</h1>
+        <p>Sigue los pasos a continuación para agendar tu cita personalizada</p>
+    </div>
+
+    <!-- Indicador de Pasos Horizontal -->
+    <div class="steps-indicator">
+        <div class="step-item {% if paso == 1 or not paso %}active{% endif %}">
+            <span class="step-number">1</span>
+            <span class="step-label">Servicio</span>
+        </div>
+        <div class="step-item {% if paso == 2 %}active{% endif %}">
+            <span class="step-number">2</span>
+            <span class="step-label">Especialista</span>
+        </div>
+        <div class="step-item {% if paso == 3 %}active{% endif %}">
+            <span class="step-number">3</span>
+            <span class="step-label">Fecha y Hora</span>
+        </div>
+        <div class="step-item {% if paso == 4 %}active{% endif %}">
+            <span class="step-number">4</span>
+            <span class="step-label">Confirmación</span>
+        </div>
+    </div>
+
+    <!-- Contenido de la Tarjeta según el Paso -->
+    <div class="booking-card">
+        {% if paso == 2 %}
+            <!-- PASO 2: SELECCIONAR ESPECIALISTA -->
+            <h2>Paso 2: Elige a tu Especialista</h2>
+            <p class="step-desc">Selecciona el/la profesional de tu preferencia para este servicio.</p>
+
+            <form method="POST" action="{{ url_for('agendar') }}">
+                <input type="hidden" name="paso" value="2">
+                <input type="hidden" name="servicio_id" value="{{ servicio_id }}">
+
+                <div class="select-services-grid">
+                    {% if especialistas %}
+                        {% for esp in especialistas %}
+                        <label class="service-option">
+                            <input type="radio" name="especialista_id" value="{{ esp['id'] }}" required>
+                            <div class="service-option-card">
+                                <span class="service-name"><i class="fa-solid fa-user-check"></i> {{ esp['nombre'] }}</span>
+                                <span class="service-desc">{{ esp['especialidad'] if esp['especialidad'] else 'Especialista en estética' }}</span>
+                            </div>
+                        </label>
+                        {% endfor %}
+                    {% else %}
+                        <label class="service-option">
+                            <input type="radio" name="especialista_id" value="0" checked>
+                            <div class="service-option-card">
+                                <span class="service-name"><i class="fa-solid fa-user-check"></i> Cualquier especialista disponible</span>
+                                <span class="service-desc">Te asignaremos al profesional disponible en el horario seleccionado.</span>
+                            </div>
+                        </label>
+                    {% endif %}
+                </div>
+
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                    <a href="{{ url_for('agendar') }}" class="btn-secondary"><i class="fa-solid fa-arrow-left"></i> Volver</a>
+                    <button type="submit" class="btn-primary"><i class="fa-solid fa-arrow-right"></i> Continuar al Paso 3</button>
+                </div>
+            </form>
+
+        {% elif paso == 3 %}
+            <!-- PASO 3: SELECCIONAR FECHA Y HORA -->
+            <h2>Paso 3: Selecciona Fecha y Hora</h2>
+            <p class="step-desc">Elige el día y la hora disponible que mejor se adapte a tu agenda.</p>
+
+            <form method="POST" action="{{ url_for('agendar') }}" class="datetime-form">
+                <input type="hidden" name="paso" value="3">
+                <input type="hidden" name="servicio_id" value="{{ servicio_id }}">
+                <input type="hidden" name="especialista_id" value="{{ especialista_id }}">
+
+                <div class="form-group">
+                    <label for="fecha"><i class="fa-regular fa-calendar"></i> Fecha de la Cita</label>
+                    <input type="date" id="fecha" name="fecha" required min="{{ hoy if hoy else '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="hora"><i class="fa-regular fa-clock"></i> Hora disponible</label>
+                    <select id="hora" name="hora" required class="form-control">
+                        <option value="">-- Selecciona una hora --</option>
+                        <option value="09:00">09:00 AM</option>
+                        <option value="10:30">10:30 AM</option>
+                        <option value="12:00">12:00 PM</option>
+                        <option value="14:00">02:00 PM</option>
+                        <option value="15:30">03:30 PM</option>
+                        <option value="17:00">05:00 PM</option>
+                        <option value="18:30">06:30 PM</option>
+                    </select>
+                </div>
+
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                    <button type="submit" class="btn-primary"><i class="fa-solid fa-arrow-right"></i> Revisar Reserva</button>
+                </div>
+            </form>
+
+        {% elif paso == 4 %}
+            <!-- PASO 4: CONFIRMACIÓN Y RESUMEN -->
+            <h2>Paso 4: Confirma tu Reserva</h2>
+            <p class="step-desc">Por favor, revisa que los detalles de tu cita sean correctos antes de confirmar.</p>
+
+            <div class="user-info-box" style="text-align: center; margin-bottom: 1.5rem;">
+                <p><strong><i class="fa-solid fa-wand-magic-sparkles"></i> Servicio:</strong> {{ servicio_info['nombre'] if servicio_info else 'Servicio' }}</p>
+                <p><strong><i class="fa-regular fa-clock"></i> Duración:</strong> {{ servicio_info['duracion_min'] if servicio_info else '60' }} min</p>
+                <p><strong><i class="fa-solid fa-tag"></i> Precio:</strong> ${{ "%.2f"|format(servicio_info['precio']) if servicio_info and servicio_info['precio'] else '0.00' }} MXN</p>
+                <p><strong><i class="fa-regular fa-calendar-days"></i> Fecha:</strong> {{ fecha }}</p>
+                <p><strong><i class="fa-regular fa-clock"></i> Hora:</strong> {{ hora }}</p>
+            </div>
+
+            <form method="POST" action="{{ url_for('agendar') }}">
+                <input type="hidden" name="paso" value="4">
+                <input type="hidden" name="servicio_id" value="{{ servicio_id }}">
+                <input type="hidden" name="especialista_id" value="{{ especialista_id }}">
+                <input type="hidden" name="fecha" value="{{ fecha }}">
+                <input type="hidden" name="hora" value="{{ hora }}">
+
+                <div class="form-group" style="text-align: left;">
+                    <label for="notas">Notas o solicitudes especiales (opcional)</label>
+                    <textarea id="notas" name="notas" rows="2" placeholder="Ej. Preferencia de espacio, sensibilidad, etc."></textarea>
+                </div>
+
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                    <a href="{{ url_for('agendar') }}" class="btn-secondary"><i class="fa-solid fa-rotate-left"></i> Reiniciar</a>
+                    <button type="submit" class="btn-primary"><i class="fa-solid fa-check"></i> Confirmar y Reservar Cita</button>
+                </div>
+            </form>
+
+        {% else %}
+            <!-- PASO 1: SELECCIONAR SERVICIO (POR DEFECTO) -->
+            <h2>Paso 1: Selecciona un Servicio</h2>
+            <p class="step-desc">Elige la experiencia o tratamiento que deseas recibir.</p>
+
+            <form method="POST" action="{{ url_for('agendar') }}">
+                <input type="hidden" name="paso" value="1">
+                <div class="select-services-grid">
+                    {% if servicios %}
+                        {% for s in servicios %}
+                        <label class="service-option">
+                            <input type="radio" name="servicio_id" value="{{ s['id'] }}" required>
+                            <div class="service-option-card">
+                                <span class="service-name">{{ s['nombre'] }}</span>
+                                <span class="service-price">${{ "%.2f"|format(s['precio']) }} MXN</span>
+                                <span class="service-desc">{{ s['descripcion'] }}</span>
+                                <span class="service-time"><i class="fa-regular fa-clock"></i> {{ s['duracion_min'] }} min</span>
+                            </div>
+                        </label>
+                        {% endfor %}
+                    {% else %}
+                        <p>No hay servicios disponibles por el momento.</p>
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="btn-primary" style="margin-top: 1rem;"><i class="fa-solid fa-arrow-right"></i> Continuar al Paso 2</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

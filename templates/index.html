@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}Inicio - Lumina Studio{% endblock %}
+
+{% block content %}
+<section class="hero-section">
+    <h1>Un espacio para conectar con tu calma</h1>
+    <p>Servicios de estética, cuidado personal y tratamientos exclusivos pensados para ti.</p>
+    <a href="{{ url_for('agendar') }}" class="btn-primary"><i class="fa-solid fa-calendar-check"></i> Agendar una Cita</a>
+</section>
+
+<section class="services-preview-section" id="servicios">
+    <h2 class="section-title">Nuestros Servicios y Estilos</h2>
+    <p class="section-subtitle">Selecciona un tratamiento para agendar tu cita</p>
+
+    <div class="services-grid">
+        {% if servicios %}
+            {% for s in servicios %}
+            <div class="service-card">
+                <div class="service-icon">
+                    <i class="fa-solid {{ s[4] if s|length > 4 and s[4] else 'fa-sparkles' }}"></i>
+                </div>
+                <h3 class="service-title">{{ s[1] }}</h3>
+                <p class="service-description">{{ s[2] }}</p>
+                <div class="service-meta">
+                    <span class="service-duration"><i class="fa-regular fa-clock"></i> {{ s[3] }} min</span>
+                    <span class="service-price">${{ "%.2f"|format(s[4]) if s|length > 4 and s[4] is number else s[4] }} MXN</span>
+                </div>
+                <a href="{{ url_for('agendar') }}" class="btn-primary btn-full"><i class="fa-solid fa-bookmark"></i> Agendar Servicio</a>
+            </div>
+            {% endfor %}
+        {% else %}
+            <!-- Servicios estáticos por defecto si no hay en la BD -->
+            <div class="service-card">
+                <div class="service-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                <h3 class="service-title">Limpieza Facial Profunda</h3>
+                <p class="service-description">Tratamiento purificante con exfoliación, extracción e hidratación intensiva para renovar tu piel.</p>
+                <div class="service-meta">
+                    <span class="service-duration"><i class="fa-regular fa-clock"></i> 60 min</span>
+                    <span class="service-price">$650.00 MXN</span>
+                </div>
+                <a href="{{ url_for('agendar') }}" class="btn-primary btn-full"><i class="fa-solid fa-bookmark"></i> Agendar Servicio</a>
+            </div>
+
+            <div class="service-card">
+                <div class="service-icon"><i class="fa-solid fa-spa"></i></div>
+                <h3 class="service-title">Masaje Relajante Corporal</h3>
+                <p class="service-description">Terapia corporal con aceites esenciales diseñada para liberar tensión muscular y reducir el estrés.</p>
+                <div class="service-meta">
+                    <span class="service-duration"><i class="fa-regular fa-clock"></i> 50 min</span>
+                    <span class="service-price">$800.00 MXN</span>
+                </div>
+                <a href="{{ url_for('agendar') }}" class="btn-primary btn-full"><i class="fa-solid fa-bookmark"></i> Agendar Servicio</a>
+            </div>
+
+            <div class="service-card">
+                <div class="service-icon"><i class="fa-solid fa-hand-sparkles"></i></div>
+                <h3 class="service-title">Manicura & Pedicura Spa</h3>
+                <p class="service-description">Cuidado completo de uñas con exfoliación orgánica, tratamiento de cutículas y esmaltado duradero.</p>
+                <div class="service-meta">
+                    <span class="service-duration"><i class="fa-regular fa-clock"></i> 75 min</span>
+                    <span class="service-price">$550.00 MXN</span>
+                </div>
+                <a href="{{ url_for('agendar') }}" class="btn-primary btn-full"><i class="fa-solid fa-bookmark"></i> Agendar Servicio</a>
+            </div>
+
+            <div class="service-card">
+                <div class="service-icon"><i class="fa-solid fa-eye"></i></div>
+                <h3 class="service-title">Lifting y Tinte de Pestañas</h3>
+                <p class="service-description">Realce natural de tus pestañas desde la raíz con nutrición de queratina para una mirada definida.</p>
+                <div class="service-meta">
+                    <span class="service-duration"><i class="fa-regular fa-clock"></i> 45 min</span>
+                    <span class="service-price">$450.00 MXN</span>
+                </div>
+                <a href="{{ url_for('agendar') }}" class="btn-primary btn-full"><i class="fa-solid fa-bookmark"></i> Agendar Servicio</a>
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
