@@ -1,5 +1,5 @@
 import os
-from datetime import date
+from datetime import datetime, date
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -251,19 +251,45 @@ def pagar_carrito():
         flash('Tu carrito está vacío.', 'warning')
         return redirect(url_for('ver_carrito'))
 
-    # Descontar stock y registrar pedido
+    # Construir lista de items comprados para el pedido
+    detalles_pedido = []
+    total_pedido = 0.0
+
     for prod_id, cantidad in carrito.items():
         try:
-            db.productos.update_one(
-                {"_id": ObjectId(prod_id)},
-                {"$inc": {"stock": -cantidad}}
-            )
+            p = db.productos.find_one({"_id": ObjectId(prod_id)})
+            if p:
+                subtotal = p['precio'] * cantidad
+                total_pedido += subtotal
+                detalles_pedido.append({
+                    "producto_id": str(p['_id']),
+                    "nombre": p['nombre'],
+                    "precio": p['precio'],
+                    "cantidad": cantidad,
+                    "subtotal": subtotal
+                })
+                # Descontar stock automáticamente
+                db.productos.update_one(
+                    {"_id": ObjectId(prod_id)},
+                    {"$inc": {"stock": -cantidad}}
+                )
         except Exception:
             pass
 
+    # Guardar pedido en MongoDB
+    nuevo_pedido = {
+        "usuario_id": str(session['usuario_id']),
+        "cliente_nombre": session.get('nombre', 'Cliente'),
+        "items": detalles_pedido,
+        "total": total_pedido,
+        "estado": "pendiente de preparar",
+        "fecha": datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    db.pedidos.insert_one(nuevo_pedido)
+
     session['carrito'] = {}
     session.modified = True
-    flash('¡Pago procesado con éxito! Tu pedido ha sido registrado en KAD.', 'success')
+    flash('¡Pago procesado con éxito! Tu pedido ha sido enviado al equipo de KAD.', 'success')
     return redirect(url_for('ver_productos'))
 
 # ------------------------------------------------------------------
@@ -410,13 +436,14 @@ def agendar():
     return render_template('agendar.html', servicios=servicios, especialistas=especialistas, paso=1)
 
 # ------------------------------------------------------------------
-# RUTAS DE ADMINISTRACIÓN (CRUD DE SERVICIOS Y PRODUCTOS)
+# RUTAS DE ADMINISTRACIÓN (CITAS, SERVICIOS, PRODUCTOS Y PEDIDOS)
 # ------------------------------------------------------------------
 
 @app.route('/admin')
 @admin_required
 def admin_panel():
     try:
+        # Citas
         citas_raw = list(db.citas.find({}).sort("fecha_hora", 1))
         citas = []
         for c in citas_raw:
@@ -446,22 +473,43 @@ def admin_panel():
                 "servicio_nombre": s["nombre"] if s and "nombre" in s else "Servicio"
             })
 
+        # Catálogo de Servicios
         catalogo_raw = list(db.servicios.find({}).sort([("tipo", 1), ("nombre", 1)]))
         catalogo = []
         for cat in catalogo_raw:
             cat['id'] = str(cat['_id'])
             catalogo.append(cat)
 
+        # Productos
         productos_raw = list(db.productos.find({}).sort("nombre", 1))
         productos = []
         for p in productos_raw:
             p['id'] = str(p['_id'])
             productos.append(p)
 
-        return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos)
+        # Pedidos realizados por clientes
+        pedidos_raw = list(db.pedidos.find({}).sort("fecha", -1))
+        pedidos = []
+        for ped in pedidos_raw:
+            ped['id'] = str(ped['_id'])
+            # Buscar datos del cliente por si acaso
+            u_id = ped.get("usuario_id")
+            cli = db.usuarios.find_one({"_id": ObjectId(u_id)}) if u_id else None
+            ped['cliente_telefono'] = cli.get('telefono', 'No registrado') if cli else 'No registrado'
+            pedidos.append(ped)
+
+        return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos)
     except Exception as e:
         flash(f'Error al cargar el panel: {str(e)}', 'danger')
         return redirect(url_for('index'))
+
+@app.route('/admin/pedido/estado/<pedido_id>/<estado>')
+@admin_required
+def cambiar_estado_pedido(pedido_id, estado):
+    if estado in ['pendiente de preparar', 'en preparación', 'listo para entregar', 'completado']:
+        db.pedidos.update_one({"_id": ObjectId(pedido_id)}, {"$set": {"estado": estado}})
+        flash(f'El estado del pedido ha sido actualizado a: {estado}.', 'info')
+    return redirect(url_for('admin_panel'))
 
 @app.route('/admin/servicio/nuevo', methods=['POST'])
 @admin_required
@@ -490,9 +538,6 @@ def agregar_servicio():
         }
         db.servicios.insert_one(nuevo_servicio)
         flash('Servicio agregado al catálogo correctamente.', 'success')
-    else:
-        flash('El nombre del servicio es obligatorio.', 'danger')
-        
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/servicio/editar/<servicio_id>', methods=['POST'])
@@ -509,13 +554,7 @@ def editar_servicio(servicio_id):
 
     db.servicios.update_one(
         {"_id": ObjectId(servicio_id)},
-        {"$set": {
-            "nombre": nombre,
-            "descripcion": descripcion,
-            "precio": precio,
-            "duracion_min": duracion,
-            "imagen_url": imagen_url
-        }}
+        {"$set": {"nombre": nombre, "descripcion": descripcion, "precio": precio, "duracion_min": duracion, "imagen_url": imagen_url}}
     )
     flash('Servicio actualizado con éxito.', 'success')
     return redirect(url_for('admin_panel'))
@@ -572,13 +611,7 @@ def editar_producto(producto_id):
 
     db.productos.update_one(
         {"_id": ObjectId(producto_id)},
-        {"$set": {
-            "nombre": nombre,
-            "descripcion": descripcion,
-            "precio": precio,
-            "stock": stock,
-            "imagen_url": imagen_url
-        }}
+        {"$set": {"nombre": nombre, "descripcion": descripcion, "precio": precio, "stock": stock, "imagen_url": imagen_url}}
     )
     flash('Producto actualizado con éxito.', 'success')
     return redirect(url_for('admin_panel'))
