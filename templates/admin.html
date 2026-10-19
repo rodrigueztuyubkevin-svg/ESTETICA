@@ -8,18 +8,15 @@
     body { background-color: #f4f1ea; }
     .admin-card { background: #ffffff; border: none; border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05); }
     .btn-action-success { background-color: #198754; color: white; border-radius: 50px; font-size: 0.8rem; font-weight: 600; padding: 4px 10px; text-decoration: none; }
-    .btn-action-success:hover { background-color: #146c43; color: white; }
     .btn-action-primary { background-color: #0d6efd; color: white; border-radius: 50px; font-size: 0.8rem; font-weight: 600; padding: 4px 10px; text-decoration: none; }
-    .btn-action-primary:hover { background-color: #0b5ed7; color: white; }
     .btn-action-danger { background-color: #dc3545; color: white; border-radius: 50px; font-size: 0.8rem; font-weight: 600; padding: 4px 10px; text-decoration: none; }
-    .btn-action-danger:hover { background-color: #bb2d3b; color: white; }
 </style>
 
 <div class="container py-5">
     <div class="row mb-5 text-center">
         <div class="col-12">
             <h1 class="fw-bold text-dark display-5">Panel de Administración</h1>
-            <p class="text-muted fs-5">Gestiona las citas, el catálogo de servicios y la tienda de productos de KAD.</p>
+            <p class="text-muted fs-5">Gestiona citas, servicios y productos de KAD con control total de edición.</p>
         </div>
     </div>
 
@@ -37,12 +34,12 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="py-3">Cliente</th>
-                                    <th class="py-3">Teléfono</th>
-                                    <th class="py-3">Servicio</th>
-                                    <th class="py-3">Fecha y Hora</th>
-                                    <th class="py-3">Estado</th>
-                                    <th class="py-3 text-center">Acciones</th>
+                                    <th>Cliente</th>
+                                    <th>Teléfono</th>
+                                    <th>Servicio</th>
+                                    <th>Fecha y Hora</th>
+                                    <th>Estado</th>
+                                    <th class="text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -70,40 +67,23 @@
                         </table>
                     </div>
                 {% else %}
-                    <div class="text-center py-4">
-                        <p class="text-muted mb-0">No hay citas registradas en este momento.</p>
-                    </div>
+                    <div class="text-center py-4"><p class="text-muted mb-0">No hay citas registradas.</p></div>
                 {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- SECCIÓN 2: GESTIÓN DE SERVICIOS -->
+    <!-- SECCIÓN 2: GESTIÓN DE SERVICIOS (CRUD COMPLETO) -->
     <div class="row g-4 mb-5">
         <div class="col-lg-4">
             <div class="card admin-card p-4 h-100">
                 <h4 class="fw-bold mb-4 text-dark"><i class="bi bi-plus-circle text-success me-2"></i>Nuevo Servicio</h4>
                 <form action="{{ url_for('agregar_servicio') }}" method="POST">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">Nombre</label>
-                        <input type="text" class="form-control rounded-3" name="nombre" placeholder="Ej. Masaje Facial" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">Descripción</label>
-                        <textarea class="form-control rounded-3" name="descripcion" rows="2" placeholder="Detalle..."></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">URL de Imagen</label>
-                        <input type="url" class="form-control rounded-3" name="imagen_url" placeholder="https://...">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">Precio (MXN)</label>
-                        <input type="number" step="0.01" class="form-control rounded-3" name="precio" placeholder="0.00" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">Duración (minutos)</label>
-                        <input type="number" class="form-control rounded-3" name="duracion_min" value="60" required>
-                    </div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Nombre</label><input type="text" class="form-control rounded-3" name="nombre" required></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Descripción</label><textarea class="form-control rounded-3" name="descripcion" rows="2"></textarea></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">URL de Imagen</label><input type="url" class="form-control rounded-3" name="imagen_url" placeholder="https://..."></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Precio (MXN)</label><input type="number" step="0.01" class="form-control rounded-3" name="precio" required></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Duración (min)</label><input type="number" class="form-control rounded-3" name="duracion_min" value="60" required></div>
                     <button type="submit" class="btn btn-dark w-100 py-2 rounded-pill fw-bold">Guardar Servicio</button>
                 </form>
             </div>
@@ -116,14 +96,7 @@
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
-                                <tr>
-                                    <th>Img</th>
-                                    <th>Servicio</th>
-                                    <th>Precio</th>
-                                    <th>Duración</th>
-                                    <th>Estado</th>
-                                    <th class="text-end">Acción</th>
-                                </tr>
+                                <tr><th>Img</th><th>Servicio</th><th>Precio</th><th>Duración</th><th>Estado</th><th class="text-end">Acciones</th></tr>
                             </thead>
                             <tbody>
                                 {% for s in catalogo %}
@@ -134,11 +107,31 @@
                                     <td>{{ s.duracion_min }} min</td>
                                     <td><span class="badge bg-{{ 'success' if s.get('activo', 1) == 1 else 'secondary' }}">{{ 'Activo' if s.get('activo', 1) == 1 else 'Inactivo' }}</span></td>
                                     <td class="text-end">
-                                        <a href="{{ url_for('cambiar_estado_servicio', servicio_id=s.id) }}" class="btn btn-sm btn-outline-{{ 'danger' if s.get('activo', 1) == 1 else 'success' }} rounded-pill px-3">
+                                        <button class="btn btn-sm btn-outline-primary rounded-pill px-3 mb-1" data-bs-toggle="modal" data-bs-target="#editServicio{{ s.id }}">Editar</button>
+                                        <a href="{{ url_for('cambiar_estado_servicio', servicio_id=s.id) }}" class="btn btn-sm btn-outline-{{ 'danger' if s.get('activo', 1) == 1 else 'success' }} rounded-pill px-3 mb-1">
                                             {{ 'Desactivar' if s.get('activo', 1) == 1 else 'Activar' }}
                                         </a>
                                     </td>
                                 </tr>
+
+                                <!-- Modal Editar Servicio -->
+                                <div class="modal fade" id="editServicio{{ s.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content rounded-4 p-3">
+                                            <div class="modal-header border-0"><h5 class="fw-bold">Editar Servicio: {{ s.nombre }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                                            <form action="{{ url_for('editar_servicio', servicio_id=s.id) }}" method="POST">
+                                                <div class="modal-body text-start">
+                                                    <div class="mb-3"><label class="form-label fw-semibold">Nombre</label><input type="text" class="form-control rounded-3" name="nombre" value="{{ s.nombre }}" required></div>
+                                                    <div class="mb-3"><label class="form-label fw-semibold">Descripción</label><textarea class="form-control rounded-3" name="descripcion" rows="2">{{ s.descripcion }}</textarea></div>
+                                                    <div class="mb-3"><label class="form-label fw-semibold">URL de Imagen</label><input type="url" class="form-control rounded-3" name="imagen_url" value="{{ s.imagen_url }}"></div>
+                                                    <div class="mb-3"><label class="form-label fw-semibold">Precio (MXN)</label><input type="number" step="0.01" class="form-control rounded-3" name="precio" value="{{ s.precio }}" required></div>
+                                                    <div class="mb-3"><label class="form-label fw-semibold">Duración (min)</label><input type="number" class="form-control rounded-3" name="duracion_min" value="{{ s.duracion_min }}" required></div>
+                                                </div>
+                                                <div class="modal-footer border-0"><button type="submit" class="btn btn-dark rounded-pill px-4">Guardar Cambios</button></div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -150,32 +143,17 @@
         </div>
     </div>
 
-    <!-- SECCIÓN 3: GESTIÓN DE PRODUCTOS (TIENDA) -->
+    <!-- SECCIÓN 3: GESTIÓN DE PRODUCTOS (CRUD COMPLETO) -->
     <div class="row g-4">
         <div class="col-lg-4">
             <div class="card admin-card p-4 h-100">
                 <h4 class="fw-bold mb-4 text-dark"><i class="bi bi-bag-plus text-primary me-2"></i>Nuevo Producto</h4>
                 <form action="{{ url_for('agregar_producto') }}" method="POST">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">Nombre del Producto</label>
-                        <input type="text" class="form-control rounded-3" name="nombre" placeholder="Ej. Sérum Facial" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">Descripción</label>
-                        <textarea class="form-control rounded-3" name="descripcion" rows="2" placeholder="Detalle del producto..."></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">URL de Imagen</label>
-                        <input type="url" class="form-control rounded-3" name="imagen_url" placeholder="https://...">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">Precio (MXN)</label>
-                        <input type="number" step="0.01" class="form-control rounded-3" name="precio" placeholder="0.00" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">Stock (Inventario)</label>
-                        <input type="number" class="form-control rounded-3" name="stock" value="10" required>
-                    </div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Nombre</label><input type="text" class="form-control rounded-3" name="nombre" required></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Descripción</label><textarea class="form-control rounded-3" name="descripcion" rows="2"></textarea></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">URL de Imagen</label><input type="url" class="form-control rounded-3" name="imagen_url" placeholder="https://..."></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Precio (MXN)</label><input type="number" step="0.01" class="form-control rounded-3" name="precio" required></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Stock</label><input type="number" class="form-control rounded-3" name="stock" value="10" required></div>
                     <button type="submit" class="btn btn-dark w-100 py-2 rounded-pill fw-bold">Guardar Producto</button>
                 </form>
             </div>
@@ -188,14 +166,7 @@
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
-                                <tr>
-                                    <th>Img</th>
-                                    <th>Producto</th>
-                                    <th>Precio</th>
-                                    <th>Stock</th>
-                                    <th>Estado</th>
-                                    <th class="text-end">Acción</th>
-                                </tr>
+                                <tr><th>Img</th><th>Producto</th><th>Precio</th><th>Stock</th><th>Estado</th><th class="text-end">Acciones</th></tr>
                             </thead>
                             <tbody>
                                 {% for p in productos %}
@@ -206,17 +177,37 @@
                                     <td>{{ p.stock }} pzs</td>
                                     <td><span class="badge bg-{{ 'success' if p.get('activo', 1) == 1 else 'secondary' }}">{{ 'Activo' if p.get('activo', 1) == 1 else 'Inactivo' }}</span></td>
                                     <td class="text-end">
-                                        <a href="{{ url_for('cambiar_estado_producto', producto_id=p.id) }}" class="btn btn-sm btn-outline-{{ 'danger' if p.get('activo', 1) == 1 else 'success' }} rounded-pill px-3">
+                                        <button class="btn btn-sm btn-outline-primary rounded-pill px-3 mb-1" data-bs-toggle="modal" data-bs-target="#editProd{{ p.id }}">Editar</button>
+                                        <a href="{{ url_for('cambiar_estado_producto', producto_id=p.id) }}" class="btn btn-sm btn-outline-{{ 'danger' if p.get('activo', 1) == 1 else 'success' }} rounded-pill px-3 mb-1">
                                             {{ 'Desactivar' if p.get('activo', 1) == 1 else 'Activar' }}
                                         </a>
                                     </td>
                                 </tr>
+
+                                <!-- Modal Editar Producto -->
+                                <div class="modal fade" id="editProd{{ p.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content rounded-4 p-3">
+                                            <div class="modal-header border-0"><h5 class="fw-bold">Editar Producto: {{ p.nombre }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                                            <form action="{{ url_for('editar_producto', producto_id=p.id) }}" method="POST">
+                                                <div class="modal-body text-start">
+                                                    <div class="mb-3"><label class="form-label fw-semibold">Nombre</label><input type="text" class="form-control rounded-3" name="nombre" value="{{ p.nombre }}" required></div>
+                                                    <div class="mb-3"><label class="form-label fw-semibold">Descripción</label><textarea class="form-control rounded-3" name="descripcion" rows="2">{{ p.descripcion }}</textarea></div>
+                                                    <div class="mb-3"><label class="form-label fw-semibold">URL de Imagen</label><input type="url" class="form-control rounded-3" name="imagen_url" value="{{ p.imagen_url }}"></div>
+                                                    <div class="mb-3"><label class="form-label fw-semibold">Precio (MXN)</label><input type="number" step="0.01" class="form-control rounded-3" name="precio" value="{{ p.precio }}" required></div>
+                                                    <div class="mb-3"><label class="form-label fw-semibold">Stock</label><input type="number" class="form-control rounded-3" name="stock" value="{{ p.stock }}" required></div>
+                                                </div>
+                                                <div class="modal-footer border-0"><button type="submit" class="btn btn-dark rounded-pill px-4">Guardar Cambios</button></div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 {% else %}
-                    <p class="text-muted text-center py-4">No hay productos en la tienda.</p>
+                    <p class="text-muted text-center py-4">No hay productos registrados.</p>
                 {% endif %}
             </div>
         </div>
