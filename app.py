@@ -17,7 +17,7 @@ client = MongoClient(mongo_uri)
 db = client.get_database("lumina_studio_db")
 
 def init_db():
-    """Inicializa la colección de servicios en MongoDB si está vacía."""
+    """Asegura que los servicios iniciales existan en MongoDB si la colección está vacía."""
     if db.servicios.count_documents({}) == 0:
         servicios_iniciales = [
             {
@@ -96,23 +96,32 @@ def index():
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
     if request.method == 'POST':
-        nombre = request.form['nombre']
-        email = request.form['email']
-        telefono = request.form['telefono']
-        password = generate_password_hash(request.form['password'])
+        nombre = request.form.get('nombre', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        telefono = request.form.get('telefono', '').strip()
+        raw_password = request.form.get('password', '')
 
+        if not nombre or not email or not raw_password:
+            flash('Por favor completa todos los campos obligatorios.', 'danger')
+            return render_template('registro.html')
+
+        # Verificar si el correo ya existe en MongoDB
         if db.usuarios.find_one({"email": email}):
-            flash('El correo electrónico ya está registrado.', 'danger')
+            flash('El correo electrónico ya está registrado. Intenta iniciar sesión.', 'danger')
         else:
+            password_hash = generate_password_hash(raw_password)
             nuevo_usuario = {
                 "nombre": nombre,
                 "email": email,
                 "telefono": telefono,
-                "password": password,
+                "password": password_hash,
                 "rol": "cliente"
             }
-            res = db.usuarios.insert_one(nuevo_usuario)
-            session['usuario_id'] = str(res.inserted_id)
+            # Inserta el usuario directamente en la colección 'usuarios' de MongoDB Atlas
+            resultado = db.usuarios.insert_one(nuevo_usuario)
+            
+            # Guardar sesión inmediatamente tras un registro exitoso
+            session['usuario_id'] = str(resultado.inserted_id)
             session['nombre'] = nombre
             session['rol'] = 'cliente'
 
@@ -124,9 +133,10 @@ def registro():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
 
+        # Buscar usuario en MongoDB por su correo electrónico
         usuario = db.usuarios.find_one({"email": email})
 
         if usuario and check_password_hash(usuario['password'], password):
@@ -139,7 +149,7 @@ def login():
                 return redirect(url_for('admin_panel'))
             return redirect(url_for('perfil'))
         else:
-            flash('Credenciales incorrectas. Intenta de nuevo.', 'danger')
+            flash('Correo o contraseña incorrectos. Intenta de nuevo.', 'danger')
 
     return render_template('login.html')
 
@@ -228,7 +238,6 @@ def agendar():
     if request.method == 'POST':
         paso = request.form.get('paso', '1')
         
-        # PASO 1
         if paso == '1':
             servicio_id = request.form.get('servicio_id')
             if not servicio_id:
@@ -236,14 +245,12 @@ def agendar():
                 return render_template('agendar.html', paso=1, servicios=servicios, especialistas=especialistas)
             return render_template('agendar.html', paso=2, servicio_id=servicio_id, servicios=servicios, especialistas=especialistas)
         
-        # PASO 2
         elif paso == '2':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id', '0')
             hoy = date.today().strftime('%Y-%m-%d')
             return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, hoy=hoy, servicios=servicios, especialistas=especialistas)
         
-        # PASO 3
         elif paso == '3':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id')
@@ -265,7 +272,6 @@ def agendar():
 
             return render_template('agendar.html', paso=4, servicio_id=servicio_id, especialista_id=especialista_id, fecha=fecha, hora=hora, servicio_info=srv, servicios=servicios, especialistas=especialistas)
 
-        # PASO 4
         elif paso == '4':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id')
