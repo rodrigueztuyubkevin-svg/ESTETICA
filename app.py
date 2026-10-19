@@ -16,7 +16,7 @@ mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/estetica_db")
 client = MongoClient(mongo_uri)
 db = client.get_database("lumina_studio_db")
 
-# Inicializar servicios y especialistas por defecto si la colección está vacía
+# Inicializar servicios por defecto si la colección está vacía
 def init_db():
     if db.servicios.count_documents({}) == 0:
         servicios_iniciales = [
@@ -27,7 +27,6 @@ def init_db():
         ]
         db.servicios.insert_many(servicios_iniciales)
 
-# Ejecutar inicialización al arrancar
 with app.app_context():
     init_db()
 
@@ -87,7 +86,7 @@ def registro():
             session['rol'] = 'cliente'
 
             flash(f'¡Bienvenido/a, {nombre}! Tu cuenta se ha creado con éxito.', 'success')
-            return redirect(url_for('index'))
+            return redirect(url_for('perfil'))
 
     return render_template('registro.html')
 
@@ -126,13 +125,9 @@ def logout():
 @app.route('/perfil', methods=['GET', 'POST'])
 @login_required
 def perfil():
-    usuario_id = session['usuario_id']
+    usuario_id = str(session['usuario_id'])
 
-    try:
-        query_id = ObjectId(usuario_id) if not isinstance(usuario_id, ObjectId) else usuario_id
-    except Exception:
-        query_id = usuario_id
-
+    # Procesar guardado o actualización de la Ficha de Salud
     if request.method == 'POST':
         alergias = request.form.get('alergias', '')
         condiciones_piel = request.form.get('condiciones_piel', '')
@@ -142,7 +137,7 @@ def perfil():
         notas = request.form.get('notas_adicionales', '')
 
         ficha_data = {
-            "usuario_id": str(usuario_id),
+            "usuario_id": usuario_id,
             "alergias": alergias,
             "condiciones_piel": condiciones_piel,
             "padecimientos_especiales": padecimientos,
@@ -152,18 +147,19 @@ def perfil():
         }
 
         db.fichas_salud.update_one(
-            {"usuario_id": str(usuario_id)},
+            {"usuario_id": usuario_id},
             {"$set": ficha_data},
             upsert=True
         )
         
-        flash('Tu ficha de salud se ha actualizado correctamente.', 'success')
+        flash('Tu ficha de salud se ha guardado correctamente.', 'success')
         return redirect(url_for('perfil'))
 
-    ficha = db.fichas_salud.find_one({"usuario_id": str(usuario_id)})
+    # Obtener Ficha de Salud del usuario
+    ficha = db.fichas_salud.find_one({"usuario_id": usuario_id})
     
-    # Obtener citas del usuario
-    citas_raw = list(db.citas.find({"usuario_id": str(usuario_id)}).sort("fecha_hora", -1))
+    # Obtener Citas Agendadas del usuario
+    citas_raw = list(db.citas.find({"usuario_id": usuario_id}).sort("fecha_hora", -1))
     citas = []
     for c in citas_raw:
         srv = db.servicios.find_one({"_id": c.get("servicio_id")})
@@ -174,7 +170,13 @@ def perfil():
         c['id'] = str(c['_id'])
         citas.append(c)
 
-    usuario_info = db.usuarios.find_one({"$or": [{"_id": query_id}, {"_id": usuario_id}]})
+    # Obtener datos del usuario de forma segura
+    try:
+        obj_id = ObjectId(usuario_id)
+    except Exception:
+        obj_id = usuario_id
+
+    usuario_info = db.usuarios.find_one({"$or": [{"_id": obj_id}, {"_id": usuario_id}]})
 
     return render_template('perfil.html', usuario=usuario_info, ficha_medica=ficha, citas=citas)
 
@@ -187,6 +189,7 @@ def agendar():
     if request.method == 'POST':
         paso = request.form.get('paso', '1')
         
+        # PASO 1: Selección de Servicio -> Avanza a Paso 2
         if paso == '1':
             servicio_id = request.form.get('servicio_id')
             if not servicio_id:
@@ -194,12 +197,14 @@ def agendar():
                 return redirect(url_for('agendar'))
             return render_template('agendar.html', paso=2, servicio_id=servicio_id, servicios=servicios, especialistas=especialistas)
         
+        # PASO 2: Selección de Especialista -> Avanza a Paso 3
         elif paso == '2':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id', '0')
             hoy = date.today().strftime('%Y-%m-%d')
             return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, hoy=hoy, servicios=servicios, especialistas=especialistas)
         
+        # PASO 3: Selección de Fecha y Hora -> Avanza a Paso 4 (Resumen)
         elif paso == '3':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id')
@@ -208,11 +213,17 @@ def agendar():
             
             if not fecha or not hora:
                 flash('Por favor selecciona una fecha y hora válidas.', 'warning')
-                return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, servicios=servicios, especialistas=especialistas)
+                hoy = date.today().strftime('%Y-%m-%d')
+                return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, hoy=hoy, servicios=servicios, especialistas=especialistas)
             
-            srv = db.servicios.find_one({"_id": ObjectId(servicio_id)})
+            try:
+                srv = db.servicios.find_one({"_id": ObjectId(servicio_id)})
+            except Exception:
+                srv = db.servicios.find_one({"_id": servicio_id})
+
             return render_template('agendar.html', paso=4, servicio_id=servicio_id, especialista_id=especialista_id, fecha=fecha, hora=hora, servicio_info=srv, servicios=servicios, especialistas=especialistas)
 
+        # PASO 4: Confirmación Final y Guardado en Base de Datos
         elif paso == '4':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id')
@@ -222,10 +233,20 @@ def agendar():
 
             fecha_hora = f"{fecha} {hora}"
             
+            try:
+                serv_obj_id = ObjectId(servicio_id)
+            except Exception:
+                serv_obj_id = servicio_id
+
+            try:
+                esp_obj_id = ObjectId(especialista_id) if especialista_id and especialista_id != '0' else None
+            except Exception:
+                esp_obj_id = None
+
             nueva_cita = {
-                "usuario_id": session['usuario_id'],
-                "servicio_id": ObjectId(servicio_id),
-                "especialista_id": ObjectId(especialista_id) if especialista_id and especialista_id != '0' else None,
+                "usuario_id": str(session['usuario_id']),
+                "servicio_id": serv_obj_id,
+                "especialista_id": esp_obj_id,
                 "fecha_hora": fecha_hora,
                 "notas_cliente": notas,
                 "estado": "confirmada"
@@ -247,14 +268,15 @@ def admin_panel():
     citas_raw = list(db.citas.find({}).sort("fecha_hora", 1))
     citas = []
     for c in citas_raw:
+        u_id = c["usuario_id"]
         try:
-            u_id = ObjectId(c["usuario_id"]) if not isinstance(c["usuario_id"], ObjectId) else c["usuario_id"]
+            u_obj = ObjectId(u_id)
         except Exception:
-            u_id = c["usuario_id"]
+            u_obj = u_id
 
-        u = db.usuarios.find_one({"$or": [{"_id": u_id}, {"_id": c["usuario_id"]}]})
+        u = db.usuarios.find_one({"$or": [{"_id": u_obj}, {"_id": u_id}]})
         s = db.servicios.find_one({"_id": c["servicio_id"]})
-        f = db.fichas_salud.find_one({"usuario_id": str(c["usuario_id"])})
+        f = db.fichas_salud.find_one({"usuario_id": str(u_id)})
         
         tiene_ficha = 1 if f and (f.get("alergias") or f.get("condiciones_piel") or f.get("embarazo_lactancia") == 1) else 0
 
