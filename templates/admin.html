@@ -2,67 +2,72 @@
 
 {% block content %}
 <div class="container py-5">
-    <div class="row mb-4">
-        <div class="col-12 text-center">
-            <h1 class="fw-bold text-dark display-5">Panel de Administración - KAD</h1>
-            <p class="text-muted">Gestiona las citas de todos los usuarios y el catálogo de servicios de la estética.</p>
+    <!-- Encabezado del Panel -->
+    <div class="row mb-5 text-center">
+        <div class="col-12">
+            <h1 class="fw-bold text-dark display-5">Panel de Administración</h1>
+            <p class="text-muted fs-5">Gestiona de forma cómoda las citas de tus clientes y el catálogo de servicios de KAD.</p>
         </div>
     </div>
 
-    <!-- Pestañas de Navegación del Panel -->
-    <ul class="nav nav-pills mb-4 justify-content-center" id="adminTab" role="tablist">
+    <!-- Pestañas de Navegación -->
+    <ul class="nav nav-pills mb-5 justify-content-center gap-3" id="adminTab" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active rounded-pill px-4 fw-semibold me-2" id="citas-tab" data-bs-toggle="tab" data-bs-target="#citas" type="button" role="tab">
-                <i class="bi bi-calendar-check me-1"></i> Citas de Usuarios
+            <button class="nav-link active rounded-pill px-4 py-2 fw-semibold shadow-sm" id="citas-tab" data-bs-toggle="pill" data-bs-target="#citas" type="button" role="tab">
+                <i class="bi bi-calendar-check me-2"></i> Citas de Usuarios
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link rounded-pill px-4 fw-semibold" id="servicios-tab" data-bs-toggle="tab" data-bs-target="#servicios" type="button" role="tab">
-                <i class="bi bi-list-stars me-1"></i> Catálogo de Servicios
+            <button class="nav-link rounded-pill px-4 py-2 fw-semibold shadow-sm" id="servicios-tab" data-bs-toggle="pill" data-bs-target="#servicios" type="button" role="tab">
+                <i class="bi bi-list-stars me-2"></i> Catálogo de Servicios
             </button>
         </li>
     </ul>
 
     <div class="tab-content" id="adminTabContent">
-        <!-- SECCIÓN 1: CITAS DE TODOS LOS USUARIOS -->
+        <!-- SECCIÓN 1: CITAS DE USUARIOS -->
         <div class="tab-pane fade show active" id="citas" role="tabpanel">
-            <div class="card shadow-sm border-0 rounded-4 p-4">
-                <h3 class="fw-bold mb-4 text-dark"><i class="bi bi-people me-2"></i>Citas Registradas</h3>
+            <div class="card shadow border-0 rounded-4 p-4 p-md-5 bg-white">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="fw-bold text-dark mb-0"><i class="bi bi-people-fill me-2 text-success"></i>Citas Registradas</h3>
+                    <span class="badge bg-secondary rounded-pill px-3 py-2 fs-6">Total: {{ citas|length if citas else 0 }}</span>
+                </div>
                 
                 {% if citas and citas|length > 0 %}
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light text-uppercase fs-7">
                                 <tr>
-                                    <th>Cliente</th>
-                                    <th>Teléfono</th>
-                                    <th>Servicio</th>
-                                    <th>Fecha y Hora</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
+                                    <th class="py-3">Cliente</th>
+                                    <th class="py-3">Teléfono</th>
+                                    <th class="py-3">Servicio</th>
+                                    <th class="py-3">Fecha y Hora</th>
+                                    <th class="py-3">Estado</th>
+                                    <th class="py-3 text-end">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for cita in citas %}
-                                <tr>
-                                    <td class="fw-semibold">{{ cita.cliente_nombre }}</td>
-                                    <td>{{ cita.telefono if cita.telefono else 'No registrado' }}</td>
-                                    <td>{{ cita.servicio_nombre }}</td>
+                                <tr class="py-3">
+                                    <td class="fw-bold text-dark">{{ cita.cliente_nombre }}</td>
+                                    <td class="text-muted">{{ cita.telefono if cita.telefono else 'No registrado' }}</td>
+                                    <td class="fw-semibold text-secondary">{{ cita.servicio_nombre }}</td>
                                     <td><i class="bi bi-clock me-1 text-muted"></i>{{ cita.fecha_hora }}</td>
                                     <td>
-                                        <span class="badge bg-{{ 'success' if cita.estado == 'confirmada' else ('danger' if cita.estado == 'cancelada' else 'warning') }} text-uppercase px-3 py-2">
+                                        <span class="badge bg-{{ 'success' if cita.estado == 'confirmada' else ('danger' if cita.estado == 'cancelada' else 'warning text-dark') }} text-uppercase px-3 py-2">
                                             {{ cita.estado }}
                                         </span>
                                     </td>
-                                    <td>
+                                    <td class="text-end">
                                         <div class="dropdown">
-                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle rounded-pill px-3" type="button" data-bs-toggle="dropdown">
-                                                Cambiar Estado
+                                            <button class="btn btn-sm btn-outline-dark dropdown-toggle rounded-pill px-3" type="button" data-bs-toggle="dropdown">
+                                                Modificar
                                             </button>
-                                            <ul class="dropdown-menu">
-                                                <li><a class="dropdown-item text-success" href="{{ url_for('cambiar_estado_cita', cita_id=cita.id, estado='confirmada') }}">Confirmar</a></li>
-                                                <li><a class="dropdown-item text-warning" href="{{ url_for('cambiar_estado_cita', cita_id=cita.id, estado='completada') }}">Completar</a></li>
-                                                <li><a class="dropdown-item text-danger" href="{{ url_for('cambiar_estado_cita', cita_id=cita.id, estado='cancelada') }}">Cancelar</a></li>
+                                            <ul class="dropdown-menu shadow">
+                                                <li><a class="dropdown-item text-success fw-semibold" href="{{ url_for('cambiar_estado_cita', cita_id=cita.id, estado='confirmada') }}"><i class="bi bi-check-circle me-1"></i> Confirmar</a></li>
+                                                <li><a class="dropdown-item text-primary fw-semibold" href="{{ url_for('cambiar_estado_cita', cita_id=cita.id, estado='completada') }}"><i class="bi bi-check-all me-1"></i> Completar</a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger fw-semibold" href="{{ url_for('cambiar_estado_cita', cita_id=cita.id, estado='cancelada') }}"><i class="bi bi-x-circle me-1"></i> Cancelar</a></li>
                                             </ul>
                                         </div>
                                     </td>
@@ -73,7 +78,8 @@
                     </div>
                 {% else %}
                     <div class="text-center py-5">
-                        <p class="text-muted">No hay citas registradas en el sistema por el momento.</p>
+                        <i class="bi bi-calendar-x fs-1 text-muted d-block mb-3"></i>
+                        <p class="text-muted fs-5">No hay citas registradas en el sistema por el momento.</p>
                     </div>
                 {% endif %}
             </div>
@@ -82,61 +88,70 @@
         <!-- SECCIÓN 2: GESTIÓN DE SERVICIOS -->
         <div class="tab-pane fade" id="servicios" role="tabpanel">
             <div class="row g-4">
-                <!-- Formulario para Agregar Servicio -->
+                <!-- Formulario para Nuevo Servicio -->
                 <div class="col-lg-4">
-                    <div class="card shadow-sm border-0 rounded-4 p-4">
-                        <h4 class="fw-bold mb-3 text-dark"><i class="bi bi-plus-circle me-2"></i>Nuevo Servicio</h4>
+                    <div class="card shadow border-0 rounded-4 p-4 bg-white h-100">
+                        <h4 class="fw-bold mb-4 text-dark"><i class="bi bi-plus-circle me-2 text-success"></i>Nuevo Servicio</h4>
                         <form action="{{ url_for('agregar_servicio') }}" method="POST">
                             <div class="mb-3">
-                                <label for="nombre" class="form-label fw-semibold">Nombre del Servicio</label>
-                                <input type="text" class="form-control rounded-3" id="nombre" name="nombre" placeholder="Ej. Masaje Facial" required>
+                                <label for="nombre" class="form-label fw-semibold text-secondary">Nombre del Servicio</label>
+                                <input type="text" class="form-control p-3 rounded-3" id="nombre" name="nombre" placeholder="Ej. Masaje Facial" required>
                             </div>
                             <div class="mb-3">
-                                <label for="descripcion" class="form-label fw-semibold">Descripción</label>
-                                <textarea class="form-control rounded-3" id="descripcion" name="descripcion" rows="3" placeholder="Breve detalle..."></textarea>
+                                <label for="descripcion" class="form-label fw-semibold text-secondary">Descripción</label>
+                                <textarea class="form-control p-3 rounded-3" id="descripcion" name="descripcion" rows="3" placeholder="Breve detalle del tratamiento..."></textarea>
                             </div>
                             <div class="mb-3">
-                                <label for="precio" class="form-label fw-semibold">Precio (MXN)</label>
-                                <input type="number" step="0.01" class="form-control rounded-3" id="precio" name="precio" placeholder="0.00" required>
+                                <label for="imagen_url" class="form-label fw-semibold text-secondary">URL de la Imagen</label>
+                                <input type="url" class="form-control p-3 rounded-3" id="imagen_url" name="imagen_url" placeholder="https://unsplash.com/...">
+                            </div>
+                            <div class="mb-3">
+                                <label for="precio" class="form-label fw-semibold text-secondary">Precio (MXN)</label>
+                                <input type="number" step="0.01" class="form-control p-3 rounded-3" id="precio" name="precio" placeholder="0.00" required>
                             </div>
                             <div class="mb-4">
-                                <label for="duracion_min" class="form-label fw-semibold">Duración (minutos)</label>
-                                <input type="number" class="form-control rounded-3" id="duracion_min" name="duracion_min" value="60" required>
+                                <label for="duracion_min" class="form-label fw-semibold text-secondary">Duración (minutos)</label>
+                                <input type="number" class="form-control p-3 rounded-3" id="duracion_min" name="duracion_min" value="60" required>
                             </div>
-                            <button type="submit" class="btn btn-dark w-100 py-2 rounded-pill fw-bold">Guardar Servicio</button>
+                            <button type="submit" class="btn btn-dark w-100 py-3 rounded-pill fw-bold shadow-sm">Guardar Servicio</button>
                         </form>
                     </div>
                 </div>
 
-                <!-- Listado del Catálogo Actual -->
+                <!-- Listado de Servicios Actuales -->
                 <div class="col-lg-8">
-                    <div class="card shadow-sm border-0 rounded-4 p-4">
-                        <h4 class="fw-bold mb-4 text-dark"><i class="bi bi-list-ul me-2"></i>Catálogo Actual de KAD</h4>
+                    <div class="card shadow border-0 rounded-4 p-4 bg-white h-100">
+                        <h4 class="fw-bold mb-4 text-dark"><i class="bi bi-list-nested me-2 text-success"></i>Catálogo Actual en KAD</h4>
                         {% if catalogo and catalogo|length > 0 %}
                             <div class="table-responsive">
-                                <table class="table table-hover align-middle">
-                                    <thead class="table-light">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light text-uppercase fs-7">
                                         <tr>
-                                            <th>Servicio</th>
-                                            <th>Precio</th>
-                                            <th>Duración</th>
-                                            <th>Estado</th>
-                                            <th>Acción</th>
+                                            <th class="py-3">Imagen</th>
+                                            <th class="py-3">Servicio</th>
+                                            <th class="py-3">Precio</th>
+                                            <th class="py-3">Duración</th>
+                                            <th class="py-3">Estado</th>
+                                            <th class="py-3 text-end">Acción</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for s in catalogo %}
                                         <tr>
-                                            <td class="fw-semibold">{{ s.nombre }}</td>
-                                            <td>${{ "%.2f"|format(s.precio) }} MXN</td>
-                                            <td>{{ s.duracion_min }} min</td>
+                                            <td class="py-3">
+                                                <img src="{{ s.imagen_url if s.imagen_url else 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=100&q=80' }}" 
+                                                     class="rounded-3 object-fit-cover shadow-sm" width="55" height="55" alt="Servicio">
+                                            </td>
+                                            <td class="fw-bold text-dark">{{ s.nombre }}</td>
+                                            <td class="fw-semibold text-secondary">${{ "%.2f"|format(s.precio) }} MXN</td>
+                                            <td class="text-muted"><i class="bi bi-clock me-1"></i>{{ s.duracion_min }} min</td>
                                             <td>
-                                                <span class="badge bg-{{ 'success' if s.get('activo', 1) == 1 else 'secondary' }}">
+                                                <span class="badge bg-{{ 'success' if s.get('activo', 1) == 1 else 'secondary' }} px-3 py-2">
                                                     {{ 'Activo' if s.get('activo', 1) == 1 else 'Inactivo' }}
                                                 </span>
                                             </td>
-                                            <td>
-                                                <a href="{{ url_for('cambiar_estado_servicio', servicio_id=s.id) }}" class="btn btn-sm btn-outline-{{ 'danger' if s.get('activo', 1) == 1 else 'success' }} rounded-pill px-3">
+                                            <td class="text-end">
+                                                <a href="{{ url_for('cambiar_estado_servicio', servicio_id=s.id) }}" class="btn btn-sm btn-outline-{{ 'danger' if s.get('activo', 1) == 1 else 'success' }} rounded-pill px-3 fw-semibold">
                                                     {{ 'Desactivar' if s.get('activo', 1) == 1 else 'Activar' }}
                                                 </a>
                                             </td>
@@ -146,7 +161,9 @@
                                 </table>
                             </div>
                         {% else %}
-                            <p class="text-muted text-center py-4">No hay servicios en el catálogo.</p>
+                            <div class="text-center py-5">
+                                <p class="text-muted fs-5">No hay servicios en el catálogo actualmente.</p>
+                            </div>
                         {% endif %}
                     </div>
                 </div>
