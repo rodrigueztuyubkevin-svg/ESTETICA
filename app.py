@@ -16,14 +16,42 @@ mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/estetica_db")
 client = MongoClient(mongo_uri)
 db = client.get_database("lumina_studio_db")
 
-# Inicializar servicios por defecto si la colección está vacía
 def init_db():
+    """Asegura que los servicios iniciales existan en MongoDB si la colección está vacía."""
     if db.servicios.count_documents({}) == 0:
         servicios_iniciales = [
-            {'nombre': 'Limpieza Facial Profunda', 'descripcion': 'Tratamiento purificante con exfoliación, extracción e hidratación intensiva para renovar tu piel.', 'precio': 650.00, 'duracion_min': 60, 'tipo': 'servicio', 'activo': 1},
-            {'nombre': 'Masaje Relajante Corporal', 'descripcion': 'Terapia corporal con aceites esenciales diseñada para liberar tensión muscular y reducir el estrés.', 'precio': 800.00, 'duracion_min': 50, 'tipo': 'servicio', 'activo': 1},
-            {'nombre': 'Manicura & Pedicura Spa', 'descripcion': 'Cuidado completo de uñas con exfoliación orgánica, tratamiento de cutículas y esmaltado duradero.', 'precio': 550.00, 'duracion_min': 75, 'tipo': 'servicio', 'activo': 1},
-            {'nombre': 'Lifting y Tinte de Pestañas', 'descripcion': 'Realce natural de tus pestañas desde la raíz con nutrición de queratina para una mirada definida.', 'precio': 450.00, 'duracion_min': 45, 'tipo': 'servicio', 'activo': 1}
+            {
+                'nombre': 'Limpieza Facial Profunda',
+                'descripcion': 'Tratamiento purificante con exfoliación, extracción e hidratación intensiva para renovar tu piel.',
+                'precio': 650.00,
+                'duracion_min': 60,
+                'tipo': 'servicio',
+                'activo': 1
+            },
+            {
+                'nombre': 'Masaje Relajante Corporal',
+                'descripcion': 'Terapia corporal con aceites esenciales diseñada para liberar tensión muscular y reducir el estrés.',
+                'precio': 800.00,
+                'duracion_min': 50,
+                'tipo': 'servicio',
+                'activo': 1
+            },
+            {
+                'nombre': 'Manicura & Pedicura Spa',
+                'descripcion': 'Cuidado completo de uñas con exfoliación orgánica, tratamiento de cutículas y esmaltado duradero.',
+                'precio': 550.00,
+                'duracion_min': 75,
+                'tipo': 'servicio',
+                'activo': 1
+            },
+            {
+                'nombre': 'Lifting y Tinte de Pestañas',
+                'descripcion': 'Realce natural de tus pestañas desde la raíz con nutrición de queratina para una mirada definida.',
+                'precio': 450.00,
+                'duracion_min': 45,
+                'tipo': 'servicio',
+                'activo': 1
+            }
         ]
         db.servicios.insert_many(servicios_iniciales)
 
@@ -58,7 +86,11 @@ def admin_required(f):
 
 @app.route('/')
 def index():
-    servicios = list(db.servicios.find({"activo": 1, "tipo": "servicio"}).limit(6))
+    servicios_raw = list(db.servicios.find({"activo": 1, "tipo": "servicio"}).limit(6))
+    servicios = []
+    for s in servicios_raw:
+        s['id'] = str(s['_id'])
+        servicios.append(s)
     return render_template('index.html', servicios=servicios)
 
 @app.route('/registro', methods=['GET', 'POST'])
@@ -79,9 +111,8 @@ def registro():
                 "password": password,
                 "rol": "cliente"
             }
-            resultado = db.usuarios.insert_one(nuevo_usuario)
-            
-            session['usuario_id'] = str(resultado.inserted_id)
+            res = db.usuarios.insert_one(nuevo_usuario)
+            session['usuario_id'] = str(res.inserted_id)
             session['nombre'] = nombre
             session['rol'] = 'cliente'
 
@@ -127,7 +158,7 @@ def logout():
 def perfil():
     usuario_id = str(session['usuario_id'])
 
-    # Procesar guardado o actualización de la Ficha de Salud
+    # Procesar guardado o actualización de la Ficha Médica
     if request.method == 'POST':
         alergias = request.form.get('alergias', '')
         condiciones_piel = request.form.get('condiciones_piel', '')
@@ -151,26 +182,25 @@ def perfil():
             {"$set": ficha_data},
             upsert=True
         )
-        
-        flash('Tu ficha de salud se ha guardado correctamente.', 'success')
+        flash('Tu ficha médica y preferencias se han guardado con éxito.', 'success')
         return redirect(url_for('perfil'))
 
-    # Obtener Ficha de Salud del usuario
+    # Obtener Ficha Médica actual
     ficha = db.fichas_salud.find_one({"usuario_id": usuario_id})
     
-    # Obtener Citas Agendadas del usuario
+    # Obtener Citas Agendadas
     citas_raw = list(db.citas.find({"usuario_id": usuario_id}).sort("fecha_hora", -1))
     citas = []
     for c in citas_raw:
         srv = db.servicios.find_one({"_id": c.get("servicio_id")})
         esp = db.especialistas.find_one({"_id": c.get("especialista_id")}) if c.get("especialista_id") else None
         
-        c['servicio_nombre'] = srv['nombre'] if srv else 'Servicio'
-        c['especialista_nombre'] = esp['nombre'] if esp else 'General'
+        c['servicio_nombre'] = srv['nombre'] if srv else 'Tratamiento Estético'
+        c['especialista_nombre'] = esp['nombre'] if esp else 'Asignado según disponibilidad'
         c['id'] = str(c['_id'])
         citas.append(c)
 
-    # Obtener datos del usuario de forma segura
+    # Obtener Información del Usuario
     try:
         obj_id = ObjectId(usuario_id)
     except Exception:
@@ -183,28 +213,37 @@ def perfil():
 @app.route('/agendar', methods=['GET', 'POST'])
 @login_required
 def agendar():
-    servicios = list(db.servicios.find({"activo": 1, "tipo": "servicio"}))
-    especialistas = list(db.especialistas.find({}))
+    servicios_raw = list(db.servicios.find({"activo": 1, "tipo": "servicio"}))
+    servicios = []
+    for s in servicios_raw:
+        s['id'] = str(s['_id'])
+        servicios.append(s)
+
+    especialistas_raw = list(db.especialistas.find({}))
+    especialistas = []
+    for e in especialistas_raw:
+        e['id'] = str(e['_id'])
+        especialistas.append(e)
 
     if request.method == 'POST':
         paso = request.form.get('paso', '1')
         
-        # PASO 1: Selección de Servicio -> Avanza a Paso 2
+        # PASO 1: Selección de Servicio
         if paso == '1':
             servicio_id = request.form.get('servicio_id')
             if not servicio_id:
                 flash('Por favor selecciona un servicio para continuar.', 'warning')
-                return redirect(url_for('agendar'))
+                return render_template('agendar.html', paso=1, servicios=servicios, especialistas=especialistas)
             return render_template('agendar.html', paso=2, servicio_id=servicio_id, servicios=servicios, especialistas=especialistas)
         
-        # PASO 2: Selección de Especialista -> Avanza a Paso 3
+        # PASO 2: Selección de Especialista
         elif paso == '2':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id', '0')
             hoy = date.today().strftime('%Y-%m-%d')
             return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, hoy=hoy, servicios=servicios, especialistas=especialistas)
         
-        # PASO 3: Selección de Fecha y Hora -> Avanza a Paso 4 (Resumen)
+        # PASO 3: Selección de Fecha y Hora
         elif paso == '3':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id')
@@ -221,9 +260,12 @@ def agendar():
             except Exception:
                 srv = db.servicios.find_one({"_id": servicio_id})
 
+            if srv:
+                srv['id'] = str(srv['_id'])
+
             return render_template('agendar.html', paso=4, servicio_id=servicio_id, especialista_id=especialista_id, fecha=fecha, hora=hora, servicio_info=srv, servicios=servicios, especialistas=especialistas)
 
-        # PASO 4: Confirmación Final y Guardado en Base de Datos
+        # PASO 4: Confirmación Final y Guardado
         elif paso == '4':
             servicio_id = request.form.get('servicio_id')
             especialista_id = request.form.get('especialista_id')
@@ -253,7 +295,7 @@ def agendar():
             }
 
             db.citas.insert_one(nueva_cita)
-            flash('¡Tu cita ha sido reservada con éxito!', 'success')
+            flash('¡Tu cita ha sido agendada con éxito!', 'success')
             return redirect(url_for('perfil'))
 
     return render_template('agendar.html', servicios=servicios, especialistas=especialistas, paso=1)
@@ -291,7 +333,12 @@ def admin_panel():
             "tiene_ficha": tiene_ficha
         })
 
-    catalogo = list(db.servicios.find({}).sort([("tipo", 1), ("nombre", 1)]))
+    catalogo_raw = list(db.servicios.find({}).sort([("tipo", 1), ("nombre", 1)]))
+    catalogo = []
+    for cat in catalogo_raw:
+        cat['id'] = str(cat['_id'])
+        catalogo.append(cat)
+
     return render_template('admin.html', citas=citas, catalogo=catalogo)
 
 @app.route('/admin/cita/<cita_id>/<estado>')
@@ -303,7 +350,7 @@ def cambiar_estado_cita(cita_id, estado):
     return redirect(url_for('admin_panel'))
 
 # ------------------------------------------------------------------
-# INICIALIZACIÓN
+# INICIALIZACIÓN DE LA APLICACIÓN
 # ------------------------------------------------------------------
 
 if __name__ == '__main__':

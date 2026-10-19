@@ -1,156 +1,100 @@
-{% extends 'base.html' %}
-
-{% block title %}Mi Perfil y Ficha Médica - Aura Estética{% endblock %}
+{% extends "base.html" %}
 
 {% block content %}
-<section class="profile-container fade-in-up">
-    <!-- Encabezado del Perfil -->
-    <div class="profile-header">
-        <div class="user-avatar-badge">
-            <i class="fa-solid fa-user"></i>
-        </div>
-        <div class="user-details">
-            <h2>¡Hola, {{ session.get('nombre') }}!</h2>
-            <p>Gestiona tus citas agendadas y mantén actualizada tu ficha médica de salud.</p>
+<div class="container my-5">
+    <!-- Encabezado Principal del Perfil -->
+    <div class="row mb-4 text-center">
+        <div class="col-12">
+            <h2 class="fw-bold text-dark">Mi Perfil</h2>
+            <p class="text-muted">Gestiona tu información personal, tus citas agendadas y tu ficha médica.</p>
         </div>
     </div>
 
-    <div class="profile-grid">
-        
-        <!-- COLUMNA IZQUIERDA: Formulario de Ficha Médica y Preferencias -->
-        <div class="profile-card">
-            <div class="card-title-box">
-                <i class="fa-solid fa-notes-medical icon"></i>
-                <h3>Mi Ficha Médica & Preferencias</h3>
-            </div>
-            <p class="section-desc">Esta información ayuda a nuestras especialistas a personalizar tus tratamientos de forma segura.</p>
-
-            <form action="{{ url_for('perfil') }}" method="POST" class="health-form">
-                
-                <!-- Condición 1: Alergias -->
-                <div class="form-group margin-top">
-                    <label class="checkbox-container">
-                        <input type="checkbox" id="check_alergias" 
-                               {% if ficha and ficha.alergias %}checked{% endif %} 
-                               onchange="toggleField('check_alergias', 'field_alergias')">
-                        <span>¿Padeces alguna alergia a componentes o cosméticos?</span>
-                    </label>
-                    <div id="field_alergias" class="conditional-field {% if not (ficha and ficha.alergias) %}hidden{% endif %}">
-                        <label for="alergias" class="sub-label">Especifica tus alergias:</label>
-                        <textarea id="alergias" name="alergias" class="form-input" rows="2" 
-                                  placeholder="Ej. Alergia al látex, fragancias sintéticas, frutos secos, etc.">{{ ficha.alergias if ficha else '' }}</textarea>
-                    </div>
+    <div class="row g-4">
+        <!-- Columna Izquierda: Datos del Usuario y Citas Agendadas -->
+        <div class="col-lg-6">
+            <!-- Datos Personales -->
+            <div class="card shadow-sm border-0 mb-4 rounded-3">
+                <div class="card-body p-4">
+                    <h4 class="fw-bold mb-3 text-success"><i class="bi bi-person-circle me-2"></i>Información Personal</h4>
+                    <hr class="text-muted opacity-25 mb-3">
+                    <p class="mb-2"><strong>Nombre:</strong> {{ usuario.nombre if usuario else session.get('nombre') }}</p>
+                    <p class="mb-2"><strong>Correo Electrónico:</strong> {{ usuario.email if usuario else 'No disponible' }}</p>
+                    <p class="mb-0"><strong>Teléfono:</strong> {{ usuario.telefono if usuario and usuario.telefono else 'No registrado' }}</p>
                 </div>
-
-                <!-- Condición 2: Piel o Sensibilidades -->
-                <div class="form-group">
-                    <label class="checkbox-container">
-                        <input type="checkbox" id="check_piel" 
-                               {% if ficha and ficha.condiciones_piel %}checked{% endif %} 
-                               onchange="toggleField('check_piel', 'field_piel')">
-                        <span>¿Tienes alguna condición o sensibilidad especial en la piel?</span>
-                    </label>
-                    <div id="field_piel" class="conditional-field {% if not (ficha and ficha.condiciones_piel) %}hidden{% endif %}">
-                        <label for="condiciones_piel" class="sub-label">Especifica el detalle o diagnóstico:</label>
-                        <textarea id="condiciones_piel" name="condiciones_piel" class="form-input" rows="2" 
-                                  placeholder="Ej. Rosácea, acné quístico, dermatitis reactiva, piel muy sensible...">{{ ficha.condiciones_piel if ficha else '' }}</textarea>
-                    </div>
-                </div>
-
-                <!-- Condición 3: Padecimientos Especiales -->
-                <div class="form-group">
-                    <label class="checkbox-container">
-                        <input type="checkbox" id="check_padecimientos" 
-                               {% if ficha and ficha.padecimientos_especiales %}checked{% endif %} 
-                               onchange="toggleField('check_padecimientos', 'field_padecimientos')">
-                        <span>¿Tienes algún padecimiento médico o tratamiento relevante?</span>
-                    </label>
-                    <div id="field_padecimientos" class="conditional-field {% if not (ficha and ficha.padecimientos_especiales) %}hidden{% endif %}">
-                        <label for="padecimientos_especiales" class="sub-label">Detalla el padecimiento:</label>
-                        <textarea id="padecimientos_especiales" name="padecimientos_especiales" class="form-input" rows="2" 
-                                  placeholder="Ej. Presión alta, problemas circulatorios, marcapasos...">{{ ficha.padecimientos_especiales if ficha else '' }}</textarea>
-                    </div>
-                </div>
-
-                <!-- Checkbox 4: Embarazo / Lactancia -->
-                <div class="form-group">
-                    <label class="checkbox-container">
-                        <input type="checkbox" name="embarazo_lactancia" value="1" 
-                               {% if ficha and ficha.embarazo_lactancia %}checked{% endif %}>
-                        <span>Actualmente en periodo de embarazo o lactancia</span>
-                    </label>
-                </div>
-
-                <!-- Checkbox 5: Cita Silenciosa -->
-                <div class="form-group">
-                    <label class="checkbox-container">
-                        <input type="checkbox" name="cita_silenciosa" value="1" 
-                               {% if ficha and ficha.cita_silenciosa %}checked{% endif %}>
-                        <span>Prefiero una "Cita Silenciosa" (descanso sin conversación durante el servicio)</span>
-                    </label>
-                </div>
-
-                <!-- Notas Adicionales -->
-                <div class="form-group">
-                    <label for="notas_adicionales" class="sub-label">Otras preferencias o notas adicionales</label>
-                    <textarea id="notas_adicionales" name="notas_adicionales" class="form-input" rows="2" 
-                              placeholder="Ej. Prefiero música ambiental suave, sensibilidad a la luz...">{{ ficha.notas_adicionales if ficha else '' }}</textarea>
-                </div>
-
-                <button type="submit" class="btn-primary margin-top"><i class="fa-solid fa-floppy-disk"></i> Guardar Ficha Médica</button>
-            </form>
-        </div>
-
-        <!-- COLUMNA DERECHA: Historial de Citas -->
-        <div class="profile-card">
-            <div class="card-title-box flex-between">
-                <div class="flex-align">
-                    <i class="fa-regular fa-calendar-check icon"></i>
-                    <h3>Mis Citas Agendadas</h3>
-                </div>
-                <a href="{{ url_for('agendar') }}" class="btn-secondary btn-sm"><i class="fa-solid fa-plus"></i> Nueva Cita</a>
             </div>
 
-            {% if citas %}
-                <div class="appointments-list margin-top">
-                    {% for cita in citas %}
-                        <div class="appointment-card">
-                            <div class="appointment-header">
-                                <h4>{{ cita.servicio_nombre }}</h4>
-                                <span class="badge badge-{{ cita.estado }}">{{ cita.estado|capitalize }}</span>
-                            </div>
-                            <div class="appointment-details">
-                                <p><i class="fa-regular fa-clock"></i> <strong>Fecha/Hora:</strong> {{ cita.fecha_hora }}</p>
-                                <p><i class="fa-regular fa-user"></i> <strong>Especialista:</strong> {{ cita.especialista_nombre or 'Cualquier Especialista' }}</p>
-                                {% if cita.notas_cliente %}
-                                    <p><i class="fa-regular fa-comment"></i> <strong>Notas:</strong> <em>"{{ cita.notas_cliente }}"</em></p>
-                                {% endif %}
-                            </div>
+            <!-- Lista de Citas Agendadas -->
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-body p-4">
+                    <h4 class="fw-bold mb-3 text-success"><i class="bi bi-calendar-check me-2"></i>Mis Citas Agendadas</h4>
+                    <hr class="text-muted opacity-25 mb-3">
+                    {% if citas and citas|length > 0 %}
+                        <div class="list-group list-group-flush">
+                            {% for cita in citas %}
+                                <div class="list-group-item px-0 py-3 border-bottom">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <h6 class="fw-bold mb-0 text-dark">{{ cita.servicio_nombre }}</h6>
+                                        <span class="badge bg-success text-uppercase">{{ cita.estado }}</span>
+                                    </div>
+                                    <p class="small text-muted mb-1"><i class="bi bi-clock me-1"></i>Fecha y hora: {{ cita.fecha_hora }}</p>
+                                    <p class="small text-muted mb-0"><i class="bi bi-person me-1"></i>Especialista: {{ cita.especialista_nombre }}</p>
+                                </div>
+                            {% endfor %}
                         </div>
-                    {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <p class="text-muted mb-3">Aún no tienes ninguna cita reservada.</p>
+                            <a href="{{ url_for('agendar') }}" class="btn btn-outline-success rounded-pill px-4">Agendar Cita Ahora</a>
+                        </div>
+                    {% endif %}
                 </div>
-            {% else %}
-                <div class="empty-state margin-top">
-                    <i class="fa-regular fa-calendar-xmark empty-icon"></i>
-                    <p>Aún no tienes ninguna cita reservada.</p>
-                    <a href="{{ url_for('agendar') }}" class="btn-primary btn-sm margin-top"><i class="fa-regular fa-calendar-plus"></i> Agendar mi primera cita</a>
-                </div>
-            {% endif %}
+            </div>
         </div>
 
-    </div>
-</section>
+        <!-- Columna Derecha: Ficha Médica Estilizada y Alineada -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-body p-4">
+                    <h4 class="fw-bold mb-2 text-dark text-center"><i class="bi bi-journal-medical me-2"></i>Ficha Médica & Preferencias</h4>
+                    <p class="small text-muted text-center mb-4">Esta información permite a nuestras especialistas personalizar tus tratamientos de forma segura.</p>
 
-<!-- Script para desplegar/ocultar los campos condicionales -->
-<script>
-    function toggleField(checkboxId, fieldId) {
-        const checkbox = document.getElementById(checkboxId);
-        const field = document.getElementById(fieldId);
-        if (checkbox.checked) {
-            field.classList.remove('hidden');
-        } else {
-            field.classList.add('hidden');
-        }
-    }
-</script>
+                    <form action="{{ url_for('perfil') }}" method="POST">
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="alergias_check" name="alergias" value="Sí" {% if ficha_medica and ficha_medica.alergias %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="alergias_check">¿Padeces alguna alergia a componentes o cosméticos?</label>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="piel_check" name="condiciones_piel" value="Sí" {% if ficha_medica and ficha_medica.condiciones_piel %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="piel_check">¿Tienes alguna condición o sensibilidad especial en la piel?</label>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="padecimientos_check" name="padecimientos_especiales" value="Sí" {% if ficha_medica and ficha_medica.padecimientos_especiales %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="padecimientos_check">¿Tienes algún padecimiento médico o tratamiento relevante?</label>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="embarazo" name="embarazo_lactancia" value="1" {% if ficha_medica and ficha_medica.embarazo_lactancia == 1 %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="embarazo">Currently en periodo de embarazo o lactancia</label>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="silenciosa" name="cita_silenciosa" value="1" {% if ficha_medica and ficha_medica.cita_silenciosa == 1 %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="silenciosa">Prefiero una "Cita Silenciosa" (descanso sin conversación durante el servicio)</label>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="notas" class="form-label fw-semibold">Otras preferencias o notas adicionales</label>
+                            <textarea class="form-control" id="notas" name="notas_adicionales" rows="3" placeholder="Ej. Prefiero música ambiental suave, sensibilidad a la luz...">{{ ficha_medica.notas_adicionales if ficha_medica and ficha_medica.notas_adicionales else '' }}</textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-dark w-100 py-2 rounded-pill fw-bold shadow-sm">Guardar Ficha Médica</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
