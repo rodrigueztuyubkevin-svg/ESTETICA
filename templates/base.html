@@ -3,131 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}KAD Studio{% endblock %}</title>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- Font Awesome CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
-    <!-- Estilos CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <title>KAD - Estética & Spa</title>
+    <!-- Carga de Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f4f1ea;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        main {
+            flex: 1;
+        }
+        .navbar-brand {
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #2c3e50 !important;
+        }
+        .footer {
+            background-color: #2c3e50;
+            color: #ffffff;
+            padding: 2rem 0;
+            margin-top: auto;
+        }
+    </style>
 </head>
 <body>
 
-    <!-- Navegación -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <a href="{{ url_for('index') }}" class="nav-brand">
-                <i class="fa-solid fa-sparkles brand-icon"></i> KAD Studio
+    <!-- Barra de Navegación -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm py-3">
+        <div class="container">
+            <a class="navbar-brand fs-4" href="{{ url_for('index') }}">
+                <i class="bi bi-flower1 text-success me-1"></i> KAD
             </a>
-
-            <button class="nav-toggle" id="navToggle" aria-label="Abrir menú">
-                <span class="hamburger"></span>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
             </button>
-
-            <ul class="nav-menu" id="navMenu">
-                <li><a href="{{ url_for('index') }}" class="nav-link"><i class="fa-solid fa-house"></i> Inicio</a></li>
-                <li><a href="{{ url_for('index') }}#servicios" class="nav-link"><i class="fa-solid fa-list-check"></i> Servicios</a></li>
-                
-                {% if session.get('usuario_id') %}
-                    <li><a href="{{ url_for('agendar') }}" class="nav-link btn-nav-highlight"><i class="fa-regular fa-calendar-check"></i> Agendar Cita</a></li>
-                    <li><a href="{{ url_for('perfil') }}" class="nav-link"><i class="fa-regular fa-user"></i> Mi Perfil</a></li>
-                    
-                    {% if session.get('rol') == 'admin' %}
-                        <li><a href="{{ url_for('admin_panel') }}" class="nav-link admin-badge"><i class="fa-solid fa-sliders"></i> Panel Admin</a></li>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <ul class="navbar-nav align-items-center">
+                    <li class="nav-item">
+                        <a class="nav-link px-3" href="{{ url_for('index') }}"><i class="bi bi-house-door me-1"></i> Inicio</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3" href="{{ url_for('index') }}#servicios"><i class="bi bi-list-stars me-1"></i> Servicios</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3" href="{{ url_for('agendar') }}"><i class="bi bi-calendar-plus me-1"></i> Agendar Cita</a>
+                    </li>
+                    {% if session.get('usuario_id') %}
+                        {% if session.get('rol') == 'admin' %}
+                            <li class="nav-item">
+                                <a class="nav-link px-3 fw-semibold text-danger" href="{{ url_for('admin_panel') }}"><i class="bi bi-speedometer2 me-1"></i> Panel Admin</a>
+                            </li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <a class="nav-link px-3 fw-semibold text-success" href="{{ url_for('perfil') }}"><i class="bi bi-person-circle me-1"></i> Mi Perfil</a>
+                        </li>
+                        <li class="nav-item ms-lg-2">
+                            <a class="btn btn-outline-danger btn-sm rounded-pill px-3" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-1"></i> Cerrar Sesión</a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item ms-lg-2">
+                            <a class="btn btn-dark btn-sm rounded-pill px-4" href="{{ url_for('login') }}">Iniciar Sesión</a>
+                        </li>
                     {% endif %}
-                    
-                    <li><a href="{{ url_for('logout') }}" class="nav-link nav-logout"><i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión</a></li>
-                {% else %}
-                    <li><a href="{{ url_for('login') }}" class="nav-link"><i class="fa-solid fa-arrow-right-to-bracket"></i> Iniciar Sesión</a></li>
-                    <li><a href="{{ url_for('registro') }}" class="btn-primary btn-sm"><i class="fa-solid fa-user-plus"></i> Registrarse</a></li>
-                {% endif %}
-            </ul>
+                </ul>
+            </div>
         </div>
     </nav>
 
-    <!-- Mensajes Flash -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="flash-messages-container">
+    <!-- Mensajes Flash de Alerta -->
+    <div class="container mt-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
                 {% for category, message in messages %}
-                    <div class="flash-message flash-{{ category }}">
-                        <span class="flash-text">{{ message }}</span>
-                        <button class="flash-close" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="alert alert-{{ 'danger' if category == 'danger' else ('success' if category == 'success' else 'info') }} alert-dismissible fade show rounded-3 shadow-sm" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
+            {% endif %}
+        {% endwith %}
+    </div>
 
     <!-- Contenido Principal -->
-    <main class="main-content">
+    <main>
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Modal para Ficha Médica -->
-    {% if session.get('usuario_id') and session.get('rol') == 'cliente' %}
-    <div class="modal-overlay" id="healthModalOverlay">
-        <div class="modal-card">
-            <i class="fa-solid fa-notes-medical modal-icon"></i>
-            <h3>Bienvenido/a a tu espacio</h3>
-            <p>Para brindarte una experiencia más personalizada y segura en tus tratamientos, puedes completar tu ficha médica cuando lo desees.</p>
-            
-            <div class="modal-actions">
-                <a href="{{ url_for('perfil') }}" class="btn-primary btn-full"><i class="fa-solid fa-pen-to-square"></i> Completar Ficha Ahora</a>
-                <button type="button" class="btn-secondary btn-full" onclick="closeHealthNotice()"><i class="fa-solid fa-xmark"></i> Omitir por ahora</button>
-            </div>
-
-            <label class="modal-dont-show">
-                <input type="checkbox" id="dontShowCheckbox">
-                <span>No volver a mostrar esta recomendación</span>
-            </label>
-        </div>
-    </div>
-    {% endif %}
-
     <!-- Pie de Página -->
-    <footer class="footer">
-        <div class="footer-container">
-            <p>&copy; 2026 Lumina Studio. Todos los derechos reservados.</p>
+    <footer class="footer text-center">
+        <div class="container">
+            <h5 class="fw-bold mb-2">KAD Estética & Spa</h5>
+            <p class="small text-white-50 mb-0">&copy; 2026 Todos los derechos reservados.</p>
         </div>
     </footer>
 
-    <script>
-        const navToggle = document.getElementById('navToggle');
-        const navMenu = document.getElementById('navMenu');
-
-        if (navToggle) {
-            navToggle.addEventListener('click', () => {
-                navMenu.classList.toggle('active');
-            });
-        }
-
-        document.addEventListener("DOMContentLoaded", function() {
-            const healthModalOverlay = document.getElementById("healthModalOverlay");
-            if (healthModalOverlay) {
-                const hideNotice = localStorage.getItem("hideHealthNotice");
-                if (!hideNotice) {
-                    setTimeout(() => {
-                        healthModalOverlay.classList.add("active");
-                    }, 400);
-                }
-            }
-        });
-
-        function closeHealthNotice() {
-            const checkbox = document.getElementById("dontShowCheckbox");
-            const healthModalOverlay = document.getElementById("healthModalOverlay");
-            if (checkbox && checkbox.checked) {
-                localStorage.setItem("hideHealthNotice", "true");
-            }
-            if (healthModalOverlay) {
-                healthModalOverlay.classList.remove("active");
-            }
-        }
-    </script>
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
