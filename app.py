@@ -1,11 +1,24 @@
+from flask import Flask, g
 import sqlite3
-from datetime import datetime
-from functools import wraps
-from flask import (
-    Flask, render_template, request, redirect,
-    url_for, session, flash, g
-)
-from werkzeug.security import generate_password_hash, check_password_hash
+import os
+
+app = Flask(__name__)
+app.secret_key = 'aura_estetica_secret_key_super_segura'
+DATABASE = 'database.db'
+
+def get_db():
+    """Conexión a la base de datos SQLite por petición."""
+    if 'db' not in g:
+        g.db = sqlite3.connect(DATABASE)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+@app.teardown_appcontext
+def close_db(exception):
+    """Cierra la conexión al finalizar la petición."""
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
 
 app = Flask(__name__)
 app.secret_key = 'aura_estetica_secret_key_super_segura'
