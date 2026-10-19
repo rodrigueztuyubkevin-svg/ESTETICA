@@ -17,7 +17,11 @@ client = MongoClient(mongo_uri)
 db = client.get_database("lumina_studio_db")
 
 def init_db():
-    """Asegura que los servicios iniciales con imágenes existan en MongoDB si la colección está vacía."""
+    """Limpia registros corruptos e inicializa el catálogo con datos válidos."""
+    # Eliminar registros incompletos o viejos sin nombre
+    db.servicios.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}, {"precio": {"$exists": False}}]})
+
+    # Si la colección está vacía, insertar catálogo completo inicial
     if db.servicios.count_documents({}) == 0:
         servicios_iniciales = [
             {
@@ -160,7 +164,7 @@ def logout():
     return redirect(url_for('index'))
 
 # ------------------------------------------------------------------
-# RUTAS DE CLIENTE: PERFIL, FICHA DE SALUD Y AGENDAMIENTO
+# RUTAS DE CLIENTE: PERFIL Y AGENDAMIENTO
 # ------------------------------------------------------------------
 
 @app.route('/perfil', methods=['GET', 'POST'])
@@ -209,8 +213,8 @@ def perfil():
         except Exception:
             esp = None
         
-        c['servicio_nombre'] = srv['nombre'] if srv else 'Tratamiento Estético'
-        c['especialista_nombre'] = esp['nombre'] if esp else 'Asignado según disponibilidad'
+        c['servicio_nombre'] = srv['nombre'] if srv and 'nombre' in srv else 'Tratamiento Estético'
+        c['especialista_nombre'] = esp['nombre'] if esp and 'nombre' in esp else 'Asignado según disponibilidad'
         c['id'] = str(c['_id'])
         citas.append(c)
 
@@ -310,7 +314,7 @@ def agendar():
     return render_template('agendar.html', servicios=servicios, especialistas=especialistas, paso=1)
 
 # ------------------------------------------------------------------
-# RUTAS DE ADMINISTRACIÓN (Blindadas contra errores de datos)
+# RUTAS DE ADMINISTRACIÓN
 # ------------------------------------------------------------------
 
 @app.route('/admin')
@@ -355,7 +359,7 @@ def admin_panel():
 
         return render_template('admin.html', citas=citas, catalogo=catalogo)
     except Exception as e:
-        flash(f'Error al cargar el panel de administración: {str(e)}', 'danger')
+        flash(f'Error al cargar el panel: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
 @app.route('/admin/cita/<cita_id>/<estado>')
@@ -366,7 +370,7 @@ def cambiar_estado_cita(cita_id, estado):
             db.citas.update_one({"_id": ObjectId(cita_id)}, {"$set": {"estado": estado}})
             flash(f'La cita ha sido marcada como {estado}.', 'info')
         except Exception:
-            flash('No se pudo actualizar el estado de la cita.', 'danger')
+            flash('No se pudo actualizar la cita.', 'danger')
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/servicio/nuevo', methods=['POST'])
