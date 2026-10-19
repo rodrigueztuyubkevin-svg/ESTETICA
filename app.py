@@ -17,7 +17,7 @@ client = MongoClient(mongo_uri)
 db = client.get_database("lumina_studio_db")
 
 def init_db():
-    """Asegura que los servicios iniciales existan en MongoDB si la colección está vacía."""
+    """Asegura que los servicios iniciales con imágenes existan en MongoDB si la colección está vacía."""
     if db.servicios.count_documents({}) == 0:
         servicios_iniciales = [
             {
@@ -26,7 +26,8 @@ def init_db():
                 'precio': 650.00,
                 'duracion_min': 60,
                 'tipo': 'servicio',
-                'activo': 1
+                'activo': 1,
+                'imagen_url': 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=600&q=80'
             },
             {
                 'nombre': 'Masaje Relajante Corporal',
@@ -34,7 +35,8 @@ def init_db():
                 'precio': 800.00,
                 'duracion_min': 50,
                 'tipo': 'servicio',
-                'activo': 1
+                'activo': 1,
+                'imagen_url': 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=600&q=80'
             },
             {
                 'nombre': 'Manicura & Pedicura Spa',
@@ -42,7 +44,8 @@ def init_db():
                 'precio': 550.00,
                 'duracion_min': 75,
                 'tipo': 'servicio',
-                'activo': 1
+                'activo': 1,
+                'imagen_url': 'https://images.unsplash.com/photo-1632345031435-8727f6c97d34?auto=format&fit=crop&w=600&q=80'
             },
             {
                 'nombre': 'Lifting y Tinte de Pestañas',
@@ -50,7 +53,8 @@ def init_db():
                 'precio': 450.00,
                 'duracion_min': 45,
                 'tipo': 'servicio',
-                'activo': 1
+                'activo': 1,
+                'imagen_url': 'https://images.unsplash.com/photo-1512290900672-8cb160161474?auto=format&fit=crop&w=600&q=80'
             }
         ]
         db.servicios.insert_many(servicios_iniciales)
@@ -105,7 +109,6 @@ def registro():
             flash('Por favor completa todos los campos obligatorios.', 'danger')
             return render_template('registro.html')
 
-        # Verificar si el correo ya existe en MongoDB
         if db.usuarios.find_one({"email": email}):
             flash('El correo electrónico ya está registrado. Intenta iniciar sesión.', 'danger')
         else:
@@ -117,10 +120,8 @@ def registro():
                 "password": password_hash,
                 "rol": "cliente"
             }
-            # Inserta el usuario directamente en la colección 'usuarios' de MongoDB Atlas
             resultado = db.usuarios.insert_one(nuevo_usuario)
             
-            # Guardar sesión inmediatamente tras un registro exitoso
             session['usuario_id'] = str(resultado.inserted_id)
             session['nombre'] = nombre
             session['rol'] = 'cliente'
@@ -136,7 +137,6 @@ def login():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
 
-        # Buscar usuario en MongoDB por su correo electrónico
         usuario = db.usuarios.find_one({"email": email})
 
         if usuario and check_password_hash(usuario['password'], password):
@@ -168,7 +168,6 @@ def logout():
 def perfil():
     usuario_id = str(session['usuario_id'])
 
-    # Guardar Ficha Médica
     if request.method == 'POST':
         alergias = request.form.get('alergias', '')
         condiciones_piel = request.form.get('condiciones_piel', '')
@@ -195,22 +194,26 @@ def perfil():
         flash('Tu ficha médica y preferencias se han guardado con éxito.', 'success')
         return redirect(url_for('perfil'))
 
-    # Obtener Ficha Médica
     ficha = db.fichas_salud.find_one({"usuario_id": usuario_id})
     
-    # Obtener Citas
     citas_raw = list(db.citas.find({"usuario_id": usuario_id}).sort("fecha_hora", -1))
     citas = []
     for c in citas_raw:
-        srv = db.servicios.find_one({"_id": c.get("servicio_id")})
-        esp = db.especialistas.find_one({"_id": c.get("especialista_id")}) if c.get("especialista_id") else None
+        try:
+            srv = db.servicios.find_one({"_id": c.get("servicio_id")})
+        except Exception:
+            srv = None
+
+        try:
+            esp = db.especialistas.find_one({"_id": c.get("especialista_id")}) if c.get("especialista_id") else None
+        except Exception:
+            esp = None
         
         c['servicio_nombre'] = srv['nombre'] if srv else 'Tratamiento Estético'
         c['especialista_nombre'] = esp['nombre'] if esp else 'Asignado según disponibilidad'
         c['id'] = str(c['_id'])
         citas.append(c)
 
-    # Obtener información del usuario
     try:
         obj_id = ObjectId(usuario_id)
     except Exception:
@@ -307,52 +310,108 @@ def agendar():
     return render_template('agendar.html', servicios=servicios, especialistas=especialistas, paso=1)
 
 # ------------------------------------------------------------------
-# RUTAS DE ADMINISTRACIÓN
+# RUTAS DE ADMINISTRACIÓN (Blindadas contra errores de datos)
 # ------------------------------------------------------------------
 
 @app.route('/admin')
 @admin_required
 def admin_panel():
-    citas_raw = list(db.citas.find({}).sort("fecha_hora", 1))
-    citas = []
-    for c in citas_raw:
-        u_id = c["usuario_id"]
-        try:
-            u_obj = ObjectId(u_id)
-        except Exception:
-            u_obj = u_id
+    try:
+        citas_raw = list(db.citas.find({}).sort("fecha_hora", 1))
+        citas = []
+        for c in citas_raw:
+            u_id = c.get("usuario_id")
+            u = None
+            if u_id:
+                try:
+                    u_obj = ObjectId(u_id) if not isinstance(u_id, ObjectId) else u_id
+                    u = db.usuarios.find_one({"$or": [{"_id": u_obj}, {"_id": u_id}]})
+                except Exception:
+                    u = db.usuarios.find_one({"_id": u_id})
 
-        u = db.usuarios.find_one({"$or": [{"_id": u_obj}, {"_id": u_id}]})
-        s = db.servicios.find_one({"_id": c["servicio_id"]})
-        f = db.fichas_salud.find_one({"usuario_id": str(u_id)})
-        
-        tiene_ficha = 1 if f and (f.get("alergias") or f.get("condiciones_piel") or f.get("embarazo_lactancia") == 1) else 0
+            s = None
+            if c.get("servicio_id"):
+                try:
+                    s_id = ObjectId(c.get("servicio_id")) if not isinstance(c.get("servicio_id"), ObjectId) else c.get("servicio_id")
+                    s = db.servicios.find_one({"_id": s_id})
+                except Exception:
+                    s = db.servicios.find_one({"_id": c.get("servicio_id")})
 
-        citas.append({
-            "id": str(c["_id"]),
-            "fecha_hora": c["fecha_hora"],
-            "estado": c.get("estado", "pendiente"),
-            "notas_cliente": c.get("notas_cliente", ""),
-            "cliente_nombre": u["nombre"] if u else "Desconocido",
-            "telefono": u.get("telefono", "") if u else "",
-            "servicio_nombre": s["nombre"] if s else "Servicio",
-            "tiene_ficha": tiene_ficha
-        })
+            citas.append({
+                "id": str(c["_id"]),
+                "fecha_hora": c.get("fecha_hora", "Sin fecha"),
+                "estado": c.get("estado", "pendiente"),
+                "notas_cliente": c.get("notas_cliente", ""),
+                "cliente_nombre": u["nombre"] if u and "nombre" in u else "Desconocido",
+                "telefono": u.get("telefono", "") if u else "",
+                "servicio_nombre": s["nombre"] if s and "nombre" in s else "Servicio"
+            })
 
-    catalogo_raw = list(db.servicios.find({}).sort([("tipo", 1), ("nombre", 1)]))
-    catalogo = []
-    for cat in catalogo_raw:
-        cat['id'] = str(cat['_id'])
-        catalogo.append(cat)
+        catalogo_raw = list(db.servicios.find({}).sort([("tipo", 1), ("nombre", 1)]))
+        catalogo = []
+        for cat in catalogo_raw:
+            cat['id'] = str(cat['_id'])
+            catalogo.append(cat)
 
-    return render_template('admin.html', citas=citas, catalogo=catalogo)
+        return render_template('admin.html', citas=citas, catalogo=catalogo)
+    except Exception as e:
+        flash(f'Error al cargar el panel de administración: {str(e)}', 'danger')
+        return redirect(url_for('index'))
 
 @app.route('/admin/cita/<cita_id>/<estado>')
 @admin_required
 def cambiar_estado_cita(cita_id, estado):
     if estado in ['confirmada', 'cancelada', 'completada']:
-        db.citas.update_one({"_id": ObjectId(cita_id)}, {"$set": {"estado": estado}})
-        flash(f'La cita ha sido marcada como {estado}.', 'info')
+        try:
+            db.citas.update_one({"_id": ObjectId(cita_id)}, {"$set": {"estado": estado}})
+            flash(f'La cita ha sido marcada como {estado}.', 'info')
+        except Exception:
+            flash('No se pudo actualizar el estado de la cita.', 'danger')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/servicio/nuevo', methods=['POST'])
+@admin_required
+def agregar_servicio():
+    nombre = request.form.get('nombre', '').strip()
+    descripcion = request.form.get('descripcion', '').strip()
+    imagen_url = request.form.get('imagen_url', '').strip()
+    try:
+        precio = float(request.form.get('precio', 0))
+    except ValueError:
+        precio = 0.0
+    try:
+        duracion = int(request.form.get('duracion_min', 30))
+    except ValueError:
+        duracion = 30
+
+    if nombre:
+        nuevo_servicio = {
+            "nombre": nombre,
+            "descripcion": descripcion,
+            "precio": precio,
+            "duracion_min": duracion,
+            "tipo": "servicio",
+            "activo": 1,
+            "imagen_url": imagen_url if imagen_url else "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80"
+        }
+        db.servicios.insert_one(nuevo_servicio)
+        flash('Servicio agregado al catálogo correctamente.', 'success')
+    else:
+        flash('El nombre del servicio es obligatorio.', 'danger')
+        
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/servicio/estado/<servicio_id>')
+@admin_required
+def cambiar_estado_servicio(servicio_id):
+    try:
+        srv = db.servicios.find_one({"_id": ObjectId(servicio_id)})
+        if srv:
+            nuevo_estado = 0 if srv.get("activo", 1) == 1 else 1
+            db.servicios.update_one({"_id": ObjectId(servicio_id)}, {"$set": {"activo": nuevo_estado}})
+            flash('El estado del servicio ha sido actualizado.', 'info')
+    except Exception:
+        flash('Error al actualizar el servicio.', 'danger')
     return redirect(url_for('admin_panel'))
 
 if __name__ == '__main__':
