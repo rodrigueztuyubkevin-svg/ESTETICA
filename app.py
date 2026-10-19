@@ -105,7 +105,6 @@ def registro():
             flash('Por favor completa todos los campos obligatorios.', 'danger')
             return render_template('registro.html')
 
-        # Verificar si el correo ya existe en MongoDB
         if db.usuarios.find_one({"email": email}):
             flash('El correo electrónico ya está registrado. Intenta iniciar sesión.', 'danger')
         else:
@@ -117,10 +116,8 @@ def registro():
                 "password": password_hash,
                 "rol": "cliente"
             }
-            # Inserta el usuario directamente en la colección 'usuarios' de MongoDB Atlas
             resultado = db.usuarios.insert_one(nuevo_usuario)
             
-            # Guardar sesión inmediatamente tras un registro exitoso
             session['usuario_id'] = str(resultado.inserted_id)
             session['nombre'] = nombre
             session['rol'] = 'cliente'
@@ -136,7 +133,6 @@ def login():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
 
-        # Buscar usuario en MongoDB por su correo electrónico
         usuario = db.usuarios.find_one({"email": email})
 
         if usuario and check_password_hash(usuario['password'], password):
@@ -168,7 +164,6 @@ def logout():
 def perfil():
     usuario_id = str(session['usuario_id'])
 
-    # Guardar Ficha Médica
     if request.method == 'POST':
         alergias = request.form.get('alergias', '')
         condiciones_piel = request.form.get('condiciones_piel', '')
@@ -195,10 +190,8 @@ def perfil():
         flash('Tu ficha médica y preferencias se han guardado con éxito.', 'success')
         return redirect(url_for('perfil'))
 
-    # Obtener Ficha Médica
     ficha = db.fichas_salud.find_one({"usuario_id": usuario_id})
     
-    # Obtener Citas
     citas_raw = list(db.citas.find({"usuario_id": usuario_id}).sort("fecha_hora", -1))
     citas = []
     for c in citas_raw:
@@ -210,7 +203,6 @@ def perfil():
         c['id'] = str(c['_id'])
         citas.append(c)
 
-    # Obtener información del usuario
     try:
         obj_id = ObjectId(usuario_id)
     except Exception:
@@ -353,6 +345,49 @@ def cambiar_estado_cita(cita_id, estado):
     if estado in ['confirmada', 'cancelada', 'completada']:
         db.citas.update_one({"_id": ObjectId(cita_id)}, {"$set": {"estado": estado}})
         flash(f'La cita ha sido marcada como {estado}.', 'info')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/servicio/nuevo', methods=['POST'])
+@admin_required
+def agregar_servicio():
+    nombre = request.form.get('nombre', '').strip()
+    descripcion = request.form.get('descripcion', '').strip()
+    try:
+        precio = float(request.form.get('precio', 0))
+    except ValueError:
+        precio = 0.0
+    try:
+        duracion = int(request.form.get('duracion_min', 30))
+    except ValueError:
+        duracion = 30
+
+    if nombre:
+        nuevo_servicio = {
+            "nombre": nombre,
+            "descripcion": descripcion,
+            "precio": precio,
+            "duracion_min": duracion,
+            "tipo": "servicio",
+            "activo": 1
+        }
+        db.servicios.insert_one(nuevo_servicio)
+        flash('Servicio agregado al catálogo correctamente.', 'success')
+    else:
+        flash('El nombre del servicio es obligatorio.', 'danger')
+        
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/servicio/estado/<servicio_id>')
+@admin_required
+def cambiar_estado_servicio(servicio_id):
+    try:
+        srv = db.servicios.find_one({"_id": ObjectId(servicio_id)})
+        if srv:
+            nuevo_estado = 0 if srv.get("activo", 1) == 1 else 1
+            db.servicios.update_one({"_id": ObjectId(servicio_id)}, {"$set": {"activo": nuevo_estado}})
+            flash('El estado del servicio ha sido actualizado.', 'info')
+    except Exception:
+        flash('Error al actualizar el servicio.', 'danger')
     return redirect(url_for('admin_panel'))
 
 if __name__ == '__main__':
