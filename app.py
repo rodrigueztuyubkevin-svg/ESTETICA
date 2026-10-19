@@ -16,7 +16,7 @@ mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/estetica_db")
 client = MongoClient(mongo_uri)
 db = client.get_database("lumina_studio_db")
 
-# Inicializar servicios por defecto si la colección está vacía
+# Inicializar servicios y especialistas por defecto si la colección está vacía
 def init_db():
     if db.servicios.count_documents({}) == 0:
         servicios_iniciales = [
@@ -128,6 +128,11 @@ def logout():
 def perfil():
     usuario_id = session['usuario_id']
 
+    try:
+        query_id = ObjectId(usuario_id) if not isinstance(usuario_id, ObjectId) else usuario_id
+    except Exception:
+        query_id = usuario_id
+
     if request.method == 'POST':
         alergias = request.form.get('alergias', '')
         condiciones_piel = request.form.get('condiciones_piel', '')
@@ -137,7 +142,7 @@ def perfil():
         notas = request.form.get('notas_adicionales', '')
 
         ficha_data = {
-            "usuario_id": usuario_id,
+            "usuario_id": str(usuario_id),
             "alergias": alergias,
             "condiciones_piel": condiciones_piel,
             "padecimientos_especiales": padecimientos,
@@ -147,7 +152,7 @@ def perfil():
         }
 
         db.fichas_salud.update_one(
-            {"usuario_id": usuario_id},
+            {"usuario_id": str(usuario_id)},
             {"$set": ficha_data},
             upsert=True
         )
@@ -155,10 +160,10 @@ def perfil():
         flash('Tu ficha de salud se ha actualizado correctamente.', 'success')
         return redirect(url_for('perfil'))
 
-    ficha = db.fichas_salud.find_one({"usuario_id": usuario_id})
+    ficha = db.fichas_salud.find_one({"usuario_id": str(usuario_id)})
     
-    # Obtener citas y hacer el cruce (join manual) con servicios y especialistas
-    citas_raw = list(db.citas.find({"usuario_id": usuario_id}).sort("fecha_hora", -1))
+    # Obtener citas del usuario
+    citas_raw = list(db.citas.find({"usuario_id": str(usuario_id)}).sort("fecha_hora", -1))
     citas = []
     for c in citas_raw:
         srv = db.servicios.find_one({"_id": c.get("servicio_id")})
@@ -169,7 +174,7 @@ def perfil():
         c['id'] = str(c['_id'])
         citas.append(c)
 
-    usuario_info = db.usuarios.find_one({"_id": ObjectId(usuario_id)})
+    usuario_info = db.usuarios.find_one({"$or": [{"_id": query_id}, {"_id": usuario_id}]})
 
     return render_template('perfil.html', usuario=usuario_info, ficha_medica=ficha, citas=citas)
 
@@ -242,9 +247,14 @@ def admin_panel():
     citas_raw = list(db.citas.find({}).sort("fecha_hora", 1))
     citas = []
     for c in citas_raw:
-        u = db.usuarios.find_one({"_id": ObjectId(c["usuario_id"])})
+        try:
+            u_id = ObjectId(c["usuario_id"]) if not isinstance(c["usuario_id"], ObjectId) else c["usuario_id"]
+        except Exception:
+            u_id = c["usuario_id"]
+
+        u = db.usuarios.find_one({"$or": [{"_id": u_id}, {"_id": c["usuario_id"]}]})
         s = db.servicios.find_one({"_id": c["servicio_id"]})
-        f = db.fichas_salud.find_one({"usuario_id": c["usuario_id"]})
+        f = db.fichas_salud.find_one({"usuario_id": str(c["usuario_id"])})
         
         tiene_ficha = 1 if f and (f.get("alergias") or f.get("condiciones_piel") or f.get("embarazo_lactancia") == 1) else 0
 
