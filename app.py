@@ -459,6 +459,10 @@ def agendar():
 # PANEL DE ADMINISTRACIÓN Y GESTIÓN CRUD (GARANTIZADO)
 # ------------------------------------------------------------------
 
+# ------------------------------------------------------------------
+# RUTAS DE ADMINISTRACIÓN (CORREGIDAS Y BLINDADAS)
+# ------------------------------------------------------------------
+
 @app.route('/admin')
 @admin_required
 def admin_panel():
@@ -515,8 +519,10 @@ def admin_panel():
             pedidos.append(ped)
 
         return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos)
+    
     except Exception as e:
-        flash(f'Error al cargar el panel: {str(e)}', 'danger')
+        # Mostramos un mensaje genérico limpio para evitar que falle el flash
+        flash('Error al cargar los datos del panel de administración.', 'danger')
         return redirect(url_for('index'))
 
 @app.route('/admin/pedido/estado/<pedido_id>/<estado>')
