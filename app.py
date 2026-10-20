@@ -1,10 +1,11 @@
 import os
 from datetime import datetime, date
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, render_template_string
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from pymongo import MongoClient
 from bson.objectid import ObjectId
+import traceback
 
 app = Flask(__name__)
 app.secret_key = 'aura_estetica_secret_key_super_segura'
@@ -17,7 +18,6 @@ client = MongoClient(mongo_uri)
 db = client.get_database("lumina_studio_db")
 
 def init_db():
-    """Inicializa servicios y productos base en MongoDB Atlas si están vacíos."""
     try:
         db.servicios.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}, {"precio": {"$exists": False}}]})
         db.productos.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}]})
@@ -164,7 +164,7 @@ def logout():
     return redirect(url_for('index'))
 
 # ------------------------------------------------------------------
-# RUTAS DE TIENDA Y CARRITO DE COMPRAS
+# RUTAS DE TIENDA Y CARRITO
 # ------------------------------------------------------------------
 
 @app.route('/productos')
@@ -447,31 +447,36 @@ def agendar():
     return render_template('agendar.html', servicios=servicios, especialistas=especialistas, paso=1)
 
 # ------------------------------------------------------------------
-# PANEL DE ADMINISTRACIÓN TOTALMENTE AISLADO Y BLINDADO
+# PANEL DE ADMINISTRACIÓN (CON CAPTURA DE EXCEPCIONES DETALLADA)
 # ------------------------------------------------------------------
 
 @app.route('/admin')
 @admin_required
 def admin_panel():
-    citas = []
-    catalogo = []
-    productos = []
-    pedidos = []
-
-    # 1. Cargar Citas de forma segura
     try:
-        for c in db.citas.find({}):
-            try:
+        citas = []
+        catalogo = []
+        productos = []
+        pedidos = []
+
+        try:
+            for c in db.citas.find({}):
                 u_id = c.get("usuario_id")
                 u = None
                 if u_id:
-                    u_obj = ObjectId(u_id) if not isinstance(u_id, ObjectId) else u_id
-                    u = db.usuarios.find_one({"$or": [{"_id": u_obj}, {"_id": u_id}]})
+                    try:
+                        u_obj = ObjectId(u_id) if not isinstance(u_id, ObjectId) else u_id
+                        u = db.usuarios.find_one({"$or": [{"_id": u_obj}, {"_id": u_id}]})
+                    except Exception:
+                        pass
 
                 s = None
                 if c.get("servicio_id"):
-                    s_id = ObjectId(c.get("servicio_id")) if not isinstance(c.get("servicio_id"), ObjectId) else c.get("servicio_id")
-                    s = db.servicios.find_one({"_id": s_id})
+                    try:
+                        s_id = ObjectId(c.get("servicio_id")) if not isinstance(c.get("servicio_id"), ObjectId) else c.get("servicio_id")
+                        s = db.servicios.find_one({"_id": s_id})
+                    except Exception:
+                        pass
 
                 citas.append({
                     "id": str(c["_id"]),
@@ -481,36 +486,35 @@ def admin_panel():
                     "telefono": u.get("telefono", "") if u else "",
                     "servicio_nombre": s["nombre"] if s and "nombre" in s else "Servicio"
                 })
-            except Exception:
-                continue
-    except Exception:
-        pass
+        except Exception as e:
+            print(f"Error procesando citas: {e}")
 
-    # 2. Cargar Servicios
-    try:
-        for cat in db.servicios.find({}):
-            cat['id'] = str(cat['_id'])
-            catalogo.append(cat)
-    except Exception:
-        pass
+        try:
+            for cat in db.servicios.find({}):
+                cat['id'] = str(cat['_id'])
+                catalogo.append(cat)
+        except Exception as e:
+            print(f"Error procesando servicios: {e}")
 
-    # 3. Cargar Productos
-    try:
-        for p in db.productos.find({}):
-            p['id'] = str(p['_id'])
-            productos.append(p)
-    except Exception:
-        pass
+        try:
+            for p in db.productos.find({}):
+                p['id'] = str(p['_id'])
+                productos.append(p)
+        except Exception as e:
+            print(f"Error procesando productos: {e}")
 
-    # 4. Cargar Pedidos
-    try:
-        for ped in db.pedidos.find({}):
-            ped['id'] = str(ped['_id'])
-            pedidos.append(ped)
-    except Exception:
-        pass
+        try:
+            for ped in db.pedidos.find({}):
+                ped['id'] = str(ped['_id'])
+                pedidos.append(ped)
+        except Exception as e:
+            print(f"Error procesando pedidos: {e}")
 
-    return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos)
+        return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos)
+    
+    except Exception as e:
+        error_msg = traceback.format_exc()
+        return f"<h3>Ocurrió un error en el servidor (500):</h3><pre>{error_msg}</pre>", 500
 
 @app.route('/admin/pedido/estado/<pedido_id>/<estado>')
 @admin_required
