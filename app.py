@@ -18,71 +18,47 @@ db = client.get_database("lumina_studio_db")
 
 def init_db():
     """Inicializa servicios y productos base en MongoDB Atlas si están vacíos."""
-    # Limpieza de datos incompletos previa
-    db.servicios.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}, {"precio": {"$exists": False}}]})
-    db.productos.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}]})
+    try:
+        db.servicios.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}, {"precio": {"$exists": False}}]})
+        db.productos.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}]})
 
-    if db.servicios.count_documents({}) == 0:
-        servicios_iniciales = [
-            {
-                'nombre': 'Limpieza Facial Profunda',
-                'descripcion': 'Tratamiento purificante con exfoliación, extracción e hidratación intensiva para renovar tu piel.',
-                'precio': 650.00,
-                'duracion_min': 60,
-                'tipo': 'servicio',
-                'activo': 1,
-                'imagen_url': 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=600&q=80'
-            },
-            {
-                'nombre': 'Masaje Relajante Corporal',
-                'descripcion': 'Terapia corporal con aceites esenciales diseñada para liberar tensión muscular y reducir el estrés.',
-                'precio': 800.00,
-                'duracion_min': 50,
-                'tipo': 'servicio',
-                'activo': 1,
-                'imagen_url': 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=600&q=80'
-            },
-            {
-                'nombre': 'Manicura & Pedicura Spa',
-                'descripcion': 'Cuidado completo de uñas con exfoliación orgánica, tratamiento de cutículas y esmaltado duradero.',
-                'precio': 550.00,
-                'duracion_min': 75,
-                'tipo': 'servicio',
-                'activo': 1,
-                'imagen_url': 'https://images.unsplash.com/photo-1632345031435-8727f6c97d34?auto=format&fit=crop&w=600&q=80'
-            },
-            {
-                'nombre': 'Lifting y Tinte de Pestañas',
-                'descripcion': 'Realce natural de tus pestañas desde la raíz con nutrición de queratina para una mirada definida.',
-                'precio': 450.00,
-                'duracion_min': 45,
-                'tipo': 'servicio',
-                'activo': 1,
-                'imagen_url': 'https://images.unsplash.com/photo-1512290900672-8cb160161474?auto=format&fit=crop&w=600&q=80'
-            }
-        ]
-        db.servicios.insert_many(servicios_iniciales)
+        if db.servicios.count_documents({}) == 0:
+            servicios_iniciales = [
+                {
+                    'nombre': 'Limpieza Facial Profunda',
+                    'descripcion': 'Tratamiento purificante con exfoliación, extracción e hidratación intensiva para renovar tu piel.',
+                    'precio': 650.00,
+                    'duracion_min': 60,
+                    'tipo': 'servicio',
+                    'activo': 1,
+                    'imagen_url': 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=600&q=80'
+                },
+                {
+                    'nombre': 'Masaje Relajante Corporal',
+                    'descripcion': 'Terapia corporal con aceites esenciales diseñada para liberar tensión muscular y reducir el estrés.',
+                    'precio': 800.00,
+                    'duracion_min': 50,
+                    'tipo': 'servicio',
+                    'activo': 1,
+                    'imagen_url': 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=600&q=80'
+                }
+            ]
+            db.servicios.insert_many(servicios_iniciales)
 
-    if db.productos.count_documents({}) == 0:
-        productos_iniciales = [
-            {
-                'nombre': 'Sérum Facial Hidratante',
-                'descripcion': 'Sérum concentrado con ácido hialurónico para una hidratación profunda y restauración cutánea.',
-                'precio': 450.00,
-                'stock': 15,
-                'activo': 1,
-                'imagen_url': 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=600&q=80'
-            },
-            {
-                'nombre': 'Exfoliante Corporal Botánico',
-                'descripcion': 'Exfoliante suave con microcristales orgánicos y aceites esenciales de lavanda.',
-                'precio': 380.00,
-                'stock': 10,
-                'activo': 1,
-                'imagen_url': 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=600&q=80'
-            }
-        ]
-        db.productos.insert_many(productos_iniciales)
+        if db.productos.count_documents({}) == 0:
+            productos_iniciales = [
+                {
+                    'nombre': 'Sérum Facial Hidratante',
+                    'descripcion': 'Sérum concentrado con ácido hialurónico para una hidratación profunda y restauración cutánea.',
+                    'precio': 450.00,
+                    'stock': 15,
+                    'activo': 1,
+                    'imagen_url': 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=600&q=80'
+                }
+            ]
+            db.productos.insert_many(productos_iniciales)
+    except Exception:
+        pass
 
 with app.app_context():
     init_db()
@@ -115,11 +91,14 @@ def admin_required(f):
 
 @app.route('/')
 def index():
-    servicios_raw = list(db.servicios.find({"activo": 1, "tipo": "servicio"}).limit(6))
-    servicios = []
-    for s in servicios_raw:
-        s['id'] = str(s['_id'])
-        servicios.append(s)
+    try:
+        servicios_raw = list(db.servicios.find({"activo": 1, "tipo": "servicio"}).limit(6))
+        servicios = []
+        for s in servicios_raw:
+            s['id'] = str(s['_id'])
+            servicios.append(s)
+    except Exception:
+        servicios = []
     return render_template('index.html', servicios=servicios)
 
 @app.route('/registro', methods=['GET', 'POST'])
@@ -190,11 +169,14 @@ def logout():
 
 @app.route('/productos')
 def ver_productos():
-    productos_raw = list(db.productos.find({"activo": 1}))
-    productos = []
-    for p in productos_raw:
-        p['id'] = str(p['_id'])
-        productos.append(p)
+    try:
+        productos_raw = list(db.productos.find({"activo": 1}))
+        productos = []
+        for p in productos_raw:
+            p['id'] = str(p['_id'])
+            productos.append(p)
+    except Exception:
+        productos = []
     return render_template('productos.html', productos=productos)
 
 @app.route('/carrito/agregar/<producto_id>', methods=['POST'])
@@ -290,7 +272,6 @@ def pagar_carrito():
                     "cantidad": cantidad,
                     "subtotal": subtotal
                 })
-                # Descontar existencias
                 db.productos.update_one(
                     {"_id": ObjectId(prod_id)},
                     {"$inc": {"stock": -cantidad}}
@@ -314,7 +295,7 @@ def pagar_carrito():
     return redirect(url_for('ver_productos'))
 
 # ------------------------------------------------------------------
-# RUTAS DE CLIENTE (PERFIL Y CITAS)
+# RUTAS DE CLIENTE
 # ------------------------------------------------------------------
 
 @app.route('/perfil', methods=['GET', 'POST'])
@@ -349,7 +330,11 @@ def perfil():
         return redirect(url_for('perfil'))
 
     ficha = db.fichas_salud.find_one({"usuario_id": usuario_id})
-    citas_raw = list(db.citas.find({"usuario_id": usuario_id}).sort("fecha_hora", -1))
+    try:
+        citas_raw = list(db.citas.find({"usuario_id": usuario_id}).sort("fecha_hora", -1))
+    except Exception:
+        citas_raw = []
+
     citas = []
     for c in citas_raw:
         try:
@@ -372,13 +357,19 @@ def perfil():
 @app.route('/agendar', methods=['GET', 'POST'])
 @login_required
 def agendar():
-    servicios_raw = list(db.servicios.find({"activo": 1, "tipo": "servicio"}))
+    try:
+        servicios_raw = list(db.servicios.find({"activo": 1, "tipo": "servicio"}))
+    except Exception:
+        servicios_raw = []
     servicios = []
     for s in servicios_raw:
         s['id'] = str(s['_id'])
         servicios.append(s)
 
-    especialistas_raw = list(db.especialistas.find({}))
+    try:
+        especialistas_raw = list(db.especialistas.find({}))
+    except Exception:
+        especialistas_raw = []
     especialistas = []
     for e in especialistas_raw:
         e['id'] = str(e['_id'])
@@ -414,7 +405,7 @@ def agendar():
             try:
                 srv = db.servicios.find_one({"_id": ObjectId(servicio_id)})
             except Exception:
-                srv = db.servicios.find_one({"_id": servicio_id})
+                srv = None
 
             if srv:
                 srv['id'] = str(srv['_id'])
@@ -456,74 +447,70 @@ def agendar():
     return render_template('agendar.html', servicios=servicios, especialistas=especialistas, paso=1)
 
 # ------------------------------------------------------------------
-# PANEL DE ADMINISTRACIÓN Y GESTIÓN CRUD (GARANTIZADO)
-# ------------------------------------------------------------------
-
-# ------------------------------------------------------------------
-# RUTAS DE ADMINISTRACIÓN (CORREGIDAS Y BLINDADAS)
+# PANEL DE ADMINISTRACIÓN TOTALMENTE AISLADO Y BLINDADO
 # ------------------------------------------------------------------
 
 @app.route('/admin')
 @admin_required
 def admin_panel():
+    citas = []
+    catalogo = []
+    productos = []
+    pedidos = []
+
+    # 1. Cargar Citas de forma segura
     try:
-        # Citas registradas
-        citas_raw = list(db.citas.find({}))
-        citas = []
-        for c in citas_raw:
-            u_id = c.get("usuario_id")
-            u = None
-            if u_id:
-                try:
+        for c in db.citas.find({}):
+            try:
+                u_id = c.get("usuario_id")
+                u = None
+                if u_id:
                     u_obj = ObjectId(u_id) if not isinstance(u_id, ObjectId) else u_id
                     u = db.usuarios.find_one({"$or": [{"_id": u_obj}, {"_id": u_id}]})
-                except Exception:
-                    u = db.usuarios.find_one({"_id": u_id})
 
-            s = None
-            if c.get("servicio_id"):
-                try:
+                s = None
+                if c.get("servicio_id"):
                     s_id = ObjectId(c.get("servicio_id")) if not isinstance(c.get("servicio_id"), ObjectId) else c.get("servicio_id")
                     s = db.servicios.find_one({"_id": s_id})
-                except Exception:
-                    s = db.servicios.find_one({"_id": c.get("servicio_id")})
 
-            citas.append({
-                "id": str(c["_id"]),
-                "fecha_hora": c.get("fecha_hora", "Sin fecha"),
-                "estado": c.get("estado", "pendiente"),
-                "cliente_nombre": u["nombre"] if u and "nombre" in u else "Desconocido",
-                "telefono": u.get("telefono", "") if u else "",
-                "servicio_nombre": s["nombre"] if s and "nombre" in s else "Servicio"
-            })
+                citas.append({
+                    "id": str(c["_id"]),
+                    "fecha_hora": c.get("fecha_hora", "Sin fecha"),
+                    "estado": c.get("estado", "pendiente"),
+                    "cliente_nombre": u["nombre"] if u and "nombre" in u else "Desconocido",
+                    "telefono": u.get("telefono", "") if u else "",
+                    "servicio_nombre": s["nombre"] if s and "nombre" in s else "Servicio"
+                })
+            except Exception:
+                continue
+    except Exception:
+        pass
 
-        # Catálogo de Servicios
-        catalogo_raw = list(db.servicios.find({}))
-        catalogo = []
-        for cat in catalogo_raw:
+    # 2. Cargar Servicios
+    try:
+        for cat in db.servicios.find({}):
             cat['id'] = str(cat['_id'])
             catalogo.append(cat)
+    except Exception:
+        pass
 
-        # Productos de la Tienda
-        productos_raw = list(db.productos.find({}))
-        productos = []
-        for p in productos_raw:
+    # 3. Cargar Productos
+    try:
+        for p in db.productos.find({}):
             p['id'] = str(p['_id'])
             productos.append(p)
+    except Exception:
+        pass
 
-        # Pedidos por Preparar
-        pedidos_raw = list(db.pedidos.find({}))
-        pedidos = []
-        for ped in pedidos_raw:
+    # 4. Cargar Pedidos
+    try:
+        for ped in db.pedidos.find({}):
             ped['id'] = str(ped['_id'])
             pedidos.append(ped)
+    except Exception:
+        pass
 
-        return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos)
-    
-    except Exception as e:
-        # Mostramos un mensaje genérico limpio para evitar que falle el flash
-        flash('Error al cargar los datos del panel de administración.', 'danger')
-        return redirect(url_for('index'))
+    return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos)
 
 @app.route('/admin/pedido/estado/<pedido_id>/<estado>')
 @admin_required
@@ -562,7 +549,7 @@ def agregar_servicio():
             "imagen_url": imagen_url if imagen_url else "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80"
         }
         db.servicios.insert_one(nuevo_servicio)
-        flash('Servicio agregado al catálogo correctamente.', 'success')
+        flash('Servicio agregado correctamente.', 'success')
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/servicio/editar/<servicio_id>', methods=['POST'])
