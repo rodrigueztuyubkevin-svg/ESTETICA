@@ -17,7 +17,8 @@ client = MongoClient(mongo_uri)
 db = client.get_database("lumina_studio_db")
 
 def init_db():
-    """Inicializa servicios y productos base en MongoDB Atlas."""
+    """Inicializa servicios y productos base en MongoDB Atlas si están vacíos."""
+    # Limpieza de datos incompletos previa
     db.servicios.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}, {"precio": {"$exists": False}}]})
     db.productos.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}]})
 
@@ -40,6 +41,24 @@ def init_db():
                 'tipo': 'servicio',
                 'activo': 1,
                 'imagen_url': 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                'nombre': 'Manicura & Pedicura Spa',
+                'descripcion': 'Cuidado completo de uñas con exfoliación orgánica, tratamiento de cutículas y esmaltado duradero.',
+                'precio': 550.00,
+                'duracion_min': 75,
+                'tipo': 'servicio',
+                'activo': 1,
+                'imagen_url': 'https://images.unsplash.com/photo-1632345031435-8727f6c97d34?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                'nombre': 'Lifting y Tinte de Pestañas',
+                'descripcion': 'Realce natural de tus pestañas desde la raíz con nutrición de queratina para una mirada definida.',
+                'precio': 450.00,
+                'duracion_min': 45,
+                'tipo': 'servicio',
+                'activo': 1,
+                'imagen_url': 'https://images.unsplash.com/photo-1512290900672-8cb160161474?auto=format&fit=crop&w=600&q=80'
             }
         ]
         db.servicios.insert_many(servicios_iniciales)
@@ -91,7 +110,7 @@ def admin_required(f):
     return decorated_function
 
 # ------------------------------------------------------------------
-# RUTAS PÚBLICAS Y DE AUTENTICACIÓN
+# RUTAS PÚBLICAS Y AUTENTICACIÓN
 # ------------------------------------------------------------------
 
 @app.route('/')
@@ -166,7 +185,7 @@ def logout():
     return redirect(url_for('index'))
 
 # ------------------------------------------------------------------
-# RUTAS DE TIENDA Y CARRITO
+# RUTAS DE TIENDA Y CARRITO DE COMPRAS
 # ------------------------------------------------------------------
 
 @app.route('/productos')
@@ -184,7 +203,11 @@ def agregar_al_carrito(producto_id):
         session['carrito'] = {}
 
     carrito = session['carrito']
-    prod = db.productos.find_one({"_id": ObjectId(producto_id)})
+    try:
+        prod = db.productos.find_one({"_id": ObjectId(producto_id)})
+    except Exception:
+        prod = None
+
     if not prod:
         flash('Producto no encontrado.', 'danger')
         return redirect(url_for('ver_productos'))
@@ -211,7 +234,7 @@ def ver_carrito():
         try:
             p = db.productos.find_one({"_id": ObjectId(prod_id)})
             if p:
-                subtotal = p['precio'] * cantidad
+                subtotal = float(p['precio']) * int(cantidad)
                 total += subtotal
                 items.append({
                     'id': str(p['_id']),
@@ -258,7 +281,7 @@ def pagar_carrito():
         try:
             p = db.productos.find_one({"_id": ObjectId(prod_id)})
             if p:
-                subtotal = p['precio'] * cantidad
+                subtotal = float(p['precio']) * int(cantidad)
                 total_pedido += subtotal
                 productos_pedido.append({
                     "producto_id": str(p['_id']),
@@ -267,6 +290,7 @@ def pagar_carrito():
                     "cantidad": cantidad,
                     "subtotal": subtotal
                 })
+                # Descontar existencias
                 db.productos.update_one(
                     {"_id": ObjectId(prod_id)},
                     {"$inc": {"stock": -cantidad}}
@@ -290,7 +314,7 @@ def pagar_carrito():
     return redirect(url_for('ver_productos'))
 
 # ------------------------------------------------------------------
-# RUTAS DE CLIENTE
+# RUTAS DE CLIENTE (PERFIL Y CITAS)
 # ------------------------------------------------------------------
 
 @app.route('/perfil', methods=['GET', 'POST'])
@@ -432,14 +456,14 @@ def agendar():
     return render_template('agendar.html', servicios=servicios, especialistas=especialistas, paso=1)
 
 # ------------------------------------------------------------------
-# RUTAS DE ADMINISTRACIÓN
+# PANEL DE ADMINISTRACIÓN Y GESTIÓN CRUD (GARANTIZADO)
 # ------------------------------------------------------------------
 
 @app.route('/admin')
 @admin_required
 def admin_panel():
     try:
-        # Citas
+        # Citas registradas
         citas_raw = list(db.citas.find({}))
         citas = []
         for c in citas_raw:
@@ -476,14 +500,14 @@ def admin_panel():
             cat['id'] = str(cat['_id'])
             catalogo.append(cat)
 
-        # Productos
+        # Productos de la Tienda
         productos_raw = list(db.productos.find({}))
         productos = []
         for p in productos_raw:
             p['id'] = str(p['_id'])
             productos.append(p)
 
-        # Pedidos
+        # Pedidos por Preparar
         pedidos_raw = list(db.pedidos.find({}))
         pedidos = []
         for ped in pedidos_raw:
@@ -499,8 +523,11 @@ def admin_panel():
 @admin_required
 def cambiar_estado_pedido(pedido_id, estado):
     if estado in ['pendiente de preparación', 'en camino', 'entregado']:
-        db.pedidos.update_one({"_id": ObjectId(pedido_id)}, {"$set": {"estado": estado}})
-        flash(f'Estado del pedido actualizado a: {estado}', 'info')
+        try:
+            db.pedidos.update_one({"_id": ObjectId(pedido_id)}, {"$set": {"estado": estado}})
+            flash(f'Estado del pedido actualizado a: {estado}', 'info')
+        except Exception:
+            flash('No se pudo actualizar el estado del pedido.', 'danger')
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/servicio/nuevo', methods=['POST'])
@@ -529,7 +556,7 @@ def agregar_servicio():
             "imagen_url": imagen_url if imagen_url else "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=600&q=80"
         }
         db.servicios.insert_one(nuevo_servicio)
-        flash('Servicio agregado correctamente.', 'success')
+        flash('Servicio agregado al catálogo correctamente.', 'success')
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/servicio/editar/<servicio_id>', methods=['POST'])
@@ -544,11 +571,15 @@ def editar_servicio(servicio_id):
     except ValueError:
         precio, duracion = 0.0, 60
 
-    db.servicios.update_one(
-        {"_id": ObjectId(servicio_id)},
-        {"$set": {"nombre": nombre, "descripcion": descripcion, "precio": precio, "duracion_min": duracion, "imagen_url": imagen_url}}
-    )
-    flash('Servicio actualizado con éxito.', 'success')
+    try:
+        db.servicios.update_one(
+            {"_id": ObjectId(servicio_id)},
+            {"$set": {"nombre": nombre, "descripcion": descripcion, "precio": precio, "duracion_min": duracion, "imagen_url": imagen_url}}
+        )
+        flash('Servicio actualizado con éxito.', 'success')
+    except Exception:
+        flash('Error al editar el servicio.', 'danger')
+
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/servicio/estado/<servicio_id>')
@@ -601,29 +632,39 @@ def editar_producto(producto_id):
     except ValueError:
         precio, stock = 0.0, 0
 
-    db.productos.update_one(
-        {"_id": ObjectId(producto_id)},
-        {"$set": {"nombre": nombre, "descripcion": descripcion, "precio": precio, "stock": stock, "imagen_url": imagen_url}}
-    )
-    flash('Producto actualizado con éxito.', 'success')
+    try:
+        db.productos.update_one(
+            {"_id": ObjectId(producto_id)},
+            {"$set": {"nombre": nombre, "descripcion": descripcion, "precio": precio, "stock": stock, "imagen_url": imagen_url}}
+        )
+        flash('Producto actualizado con éxito.', 'success')
+    except Exception:
+        flash('Error al editar el producto.', 'danger')
+
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/producto/estado/<producto_id>')
 @admin_required
 def cambiar_estado_producto(producto_id):
-    p = db.productos.find_one({"_id": ObjectId(producto_id)})
-    if p:
-        nuevo_estado = 0 if p.get("activo", 1) == 1 else 1
-        db.productos.update_one({"_id": ObjectId(producto_id)}, {"$set": {"activo": nuevo_estado}})
-        flash('Estado del producto actualizado.', 'info')
+    try:
+        p = db.productos.find_one({"_id": ObjectId(producto_id)})
+        if p:
+            nuevo_estado = 0 if p.get("activo", 1) == 1 else 1
+            db.productos.update_one({"_id": ObjectId(producto_id)}, {"$set": {"activo": nuevo_estado}})
+            flash('Estado del producto actualizado.', 'info')
+    except Exception:
+        pass
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/cita/<cita_id>/<estado>')
 @admin_required
 def cambiar_estado_cita(cita_id, estado):
     if estado in ['confirmada', 'cancelada', 'completada']:
-        db.citas.update_one({"_id": ObjectId(cita_id)}, {"$set": {"estado": estado}})
-        flash(f'La cita ha sido marcada como {estado}.', 'info')
+        try:
+            db.citas.update_one({"_id": ObjectId(cita_id)}, {"$set": {"estado": estado}})
+            flash(f'La cita ha sido marcada como {estado}.', 'info')
+        except Exception:
+            flash('No se pudo actualizar la cita.', 'danger')
     return redirect(url_for('admin_panel'))
 
 if __name__ == '__main__':
