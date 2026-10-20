@@ -20,7 +20,7 @@
         </div>
     </div>
 
-    <!-- SECCIÓN: PEDIDOS DE CLIENTES (PARA PREPARAR) -->
+    <!-- SECCIÓN: PEDIDOS DE CLIENTES -->
     <div class="row mb-5">
         <div class="col-12">
             <div class="card admin-card p-4 p-md-5 border-start border-success border-4">
@@ -60,7 +60,9 @@
                                     </td>
                                     <td class="fw-bold text-success">${{ "%.2f"|format(ped.total) if ped.total is defined else '0.00' }} MXN</td>
                                     <td>
-                                        <span class="badge bg-{{ 'warning text-dark' if ped.estado == 'pendiente de preparación' else ('info' if ped.estado == 'en camino' else 'success') }} text-uppercase px-3 py-2">
+                                        {# Lógica mejorada para los colores, sin importar cómo esté escrito el estado #}
+                                        {% set est = ped.estado | lower %}
+                                        <span class="badge bg-{{ 'warning text-dark' if 'pendiente' in est else ('info' if 'camino' in est else 'success') }} text-uppercase px-3 py-2">
                                             {{ ped.estado }}
                                         </span>
                                     </td>
@@ -172,7 +174,7 @@
                                     </td>
                                 </tr>
 
-                                <!-- Modal Editar Servicio -->
+                                <!-- Modal Editar -->
                                 <div class="modal fade" id="editServicio{{ s.id }}" tabindex="-1">
                                     <div class="modal-dialog">
                                         <div class="modal-content rounded-4 p-3">
@@ -240,7 +242,7 @@
                                     </td>
                                 </tr>
 
-                                <!-- Modal Editar Producto -->
+                                <!-- Modal Editar -->
                                 <div class="modal fade" id="editProd{{ p.id }}" tabindex="-1">
                                     <div class="modal-dialog">
                                         <div class="modal-content rounded-4 p-3">
@@ -270,5 +272,4 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 {% endblock %}

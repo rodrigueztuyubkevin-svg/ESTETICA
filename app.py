@@ -6,7 +6,32 @@ from functools import wraps
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import traceback
+from bson.objectid import ObjectId
+from flask import flash, redirect, url_for
 
+@app.route('/admin/pedido/<pedido_id>/estado/<estado>')
+@login_required
+@admin_required
+def cambiar_estado_pedido(pedido_id, estado):
+    try:
+        # Actualizamos el estado en la base de datos usando ObjectId
+        resultado = db.pedidos.update_one(
+            {'_id': ObjectId(pedido_id)},
+            {'$set': {'estado': estado}}
+        )
+        
+        if resultado.modified_count > 0:
+            flash('Estado del pedido actualizado correctamente', 'success')
+        else:
+            flash('No se pudo actualizar el pedido. Es posible que el ID no coincida.', 'warning')
+            
+    except Exception as e:
+        # Si hay un error (por ejemplo, un ID mal formado), lo imprimimos y avisamos
+        print(f"Error al cambiar estado del pedido: {e}")
+        flash('Error interno al intentar cambiar el estado del pedido.', 'danger')
+        
+    # Redirigimos de vuelta al panel de admin para ver el cambio reflejado
+    return redirect(url_for('admin_panel'))
 app = Flask(__name__)
 app.secret_key = 'aura_estetica_secret_key_super_segura'
 
