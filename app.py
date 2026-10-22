@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, date
-from flask import Flask, render_template, request, redirect, url_for, session, flash, render_template_string
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from pymongo import MongoClient
@@ -367,7 +367,7 @@ def agendar():
         servicios.append(s)
 
     try:
-        especialistas_raw = list(db.especialistas.find({}))
+        especialistas_raw = list(db.especialistas.find({"$or": [{"activo": 1}, {"activo": {"$exists": False}}]}))
     except Exception:
         especialistas_raw = []
     especialistas = []
@@ -458,8 +458,14 @@ def admin_panel():
         catalogo = []
         productos = []
         pedidos = []
+        especialistas = [] # <-- NUEVO
 
         try:
+            # Cargar especialistas
+            for esp in db.especialistas.find({}):
+                esp['id'] = str(esp['_id'])
+                especialistas.append(esp)
+
             for c in db.citas.find({}):
                 u_id = c.get("usuario_id")
                 u = None
@@ -477,6 +483,16 @@ def admin_panel():
                         s = db.servicios.find_one({"_id": s_id})
                     except Exception:
                         pass
+                
+                # Buscar el especialista de la cita
+                esp_cita = None
+                esp_id = c.get("especialista_id")
+                if esp_id:
+                    try:
+                        esp_obj = ObjectId(esp_id) if not isinstance(esp_id, ObjectId) else esp_id
+                        esp_cita = db.especialistas.find_one({"_id": esp_obj})
+                    except Exception:
+                        pass
 
                 citas.append({
                     "id": str(c["_id"]),
@@ -484,7 +500,9 @@ def admin_panel():
                     "estado": c.get("estado", "pendiente"),
                     "cliente_nombre": u["nombre"] if u and "nombre" in u else "Desconocido",
                     "telefono": u.get("telefono", "") if u else "",
-                    "servicio_nombre": s["nombre"] if s and "nombre" in s else "Servicio"
+                    "servicio_nombre": s["nombre"] if s and "nombre" in s else "Servicio",
+                    "especialista_nombre": esp_cita["nombre"] if esp_cita and "nombre" in esp_cita else "Cualquiera",
+                    "notas_cliente": c.get("notas_cliente", "Sin notas") # <-- NUEVO
                 })
         except Exception as e:
             print(f"Error procesando citas: {e}")
@@ -510,11 +528,46 @@ def admin_panel():
         except Exception as e:
             print(f"Error procesando pedidos: {e}")
 
-        return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos)
+        return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos, especialistas=especialistas)
     
     except Exception as e:
         error_msg = traceback.format_exc()
         return f"<h3>Ocurrió un error en el servidor (500):</h3><pre>{error_msg}</pre>", 500
+
+# --- RUTAS DE ESPECIALISTAS (NUEVAS) ---
+@app.route('/admin/especialista/nuevo', methods=['POST'])
+@admin_required
+def agregar_especialista():
+    nombre = request.form.get('nombre', '').strip()
+    especialidad = request.form.get('especialidad', '').strip()
+    imagen_url = request.form.get('imagen_url', '').strip()
+
+    if nombre:
+        nuevo_especialista = {
+            "nombre": nombre,
+            "especialidad": especialidad,
+            "imagen_url": imagen_url if imagen_url else "https://images.unsplash.com/photo-1595152772835-219674b2a8a6?auto=format&fit=crop&w=600&q=80",
+            "activo": 1
+        }
+        db.especialistas.insert_one(nuevo_especialista)
+        flash('Especialista agregado correctamente.', 'success')
+    else:
+        flash('El nombre del especialista es obligatorio.', 'danger')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/especialista/estado/<especialista_id>')
+@admin_required
+def cambiar_estado_especialista(especialista_id):
+    try:
+        esp = db.especialistas.find_one({"_id": ObjectId(especialista_id)})
+        if esp:
+            nuevo_estado = 0 if esp.get("activo", 1) == 1 else 1
+            db.especialistas.update_one({"_id": ObjectId(especialista_id)}, {"$set": {"activo": nuevo_estado}})
+            flash('Estado del especialista actualizado.', 'info')
+    except Exception:
+        pass
+    return redirect(url_for('admin_panel'))
+# ---------------------------------------
 
 @app.route('/admin/pedido/estado/<pedido_id>/<estado>')
 @admin_required
