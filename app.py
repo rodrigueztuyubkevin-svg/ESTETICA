@@ -3,9 +3,11 @@ from datetime import datetime, date
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from pymongo import MongoClient
+from pymongo import MongoClient, ReturnDocument
 from bson.objectid import ObjectId
 import traceback
+import random
+import string
 
 app = Flask(__name__)
 app.secret_key = 'aura_estetica_secret_key_super_segura'
@@ -62,6 +64,14 @@ def init_db():
 
 with app.app_context():
     init_db()
+
+# ------------------------------------------------------------------
+# GENERADOR DE FOLIO DE TICKET
+# ------------------------------------------------------------------
+def generar_folio_ticket():
+    fecha_str = datetime.now().strftime("%Y%m%d")
+    aleatorio = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    return f"KAD-{fecha_str}-{aleatorio}"
 
 # ------------------------------------------------------------------
 # DECORADORES DE AUTENTICACIÓN
@@ -193,8 +203,17 @@ def agregar_al_carrito(producto_id):
     if not prod:
         flash('Producto no encontrado.', 'danger')
         return redirect(url_for('ver_productos'))
+        
+    if prod.get('stock', 0) <= 0:
+        flash('Lo sentimos, este producto está agotado.', 'warning')
+        return redirect(url_for('ver_productos'))
 
     cantidad = int(request.form.get('cantidad', 1))
+    
+    cantidad_actual_en_carrito = carrito.get(producto_id, 0)
+    if cantidad_actual_en_carrito + cantidad > prod.get('stock', 0):
+        flash(f'Solo quedan {prod.get("stock")} unidades de {prod["nombre"]}.', 'warning')
+        return redirect(url_for('ver_carrito'))
 
     if producto_id in carrito:
         carrito[producto_id] += cantidad
@@ -262,37 +281,69 @@ def pagar_carrito():
     for prod_id, cantidad in carrito.items():
         try:
             p = db.productos.find_one({"_id": ObjectId(prod_id)})
-            if p:
-                subtotal = float(p['precio']) * int(cantidad)
+            if not p:
+                continue
+                
+            producto_actualizado = db.productos.find_one_and_update(
+                {"_id": ObjectId(prod_id), "stock": {"$gte": cantidad}},
+                {"$inc": {"stock": -cantidad}},
+                return_document=ReturnDocument.AFTER
+            )
+            
+            if producto_actualizado:
+                subtotal = float(producto_actualizado['precio']) * int(cantidad)
                 total_pedido += subtotal
                 productos_pedido.append({
-                    "producto_id": str(p['_id']),
-                    "nombre": p['nombre'],
-                    "precio": p['precio'],
+                    "producto_id": str(producto_actualizado['_id']),
+                    "nombre": producto_actualizado['nombre'],
+                    "precio": producto_actualizado['precio'],
                     "cantidad": cantidad,
                     "subtotal": subtotal
                 })
-                db.productos.update_one(
-                    {"_id": ObjectId(prod_id)},
-                    {"$inc": {"stock": -cantidad}}
-                )
-        except Exception:
-            pass
+                
+                if producto_actualizado.get('stock', 0) <= 0:
+                    db.productos.update_one(
+                        {"_id": ObjectId(prod_id)},
+                        {"$set": {"activo": 0}}
+                    )
+            else:
+                flash(f'No hay suficiente stock de un producto en tu carrito.', 'danger')
+                return redirect(url_for('ver_carrito'))
+                
+        except Exception as e:
+            print(f"Error al procesar el pago: {e}")
+            flash('Error al procesar el pago.', 'danger')
+            return redirect(url_for('ver_carrito'))
 
+    fecha_actual = datetime.now()
+    
+    # 1. Crear el pedido
     nuevo_pedido = {
         "usuario_id": str(session['usuario_id']),
         "cliente_nombre": session.get('nombre', 'Cliente'),
         "productos": productos_pedido,
         "total": total_pedido,
         "estado": "pendiente de preparación",
-        "fecha": datetime.now().strftime('%Y-%m-%d %H:%M')
+        "fecha": fecha_actual.strftime('%Y-%m-%d %H:%M')
     }
-    db.pedidos.insert_one(nuevo_pedido)
+    resultado_pedido = db.pedidos.insert_one(nuevo_pedido)
+    
+    # 2. Crear el ticket (NUEVO)
+    nuevo_ticket = {
+        "folio": generar_folio_ticket(),
+        "pedido_id": str(resultado_pedido.inserted_id),
+        "usuario_id": str(session['usuario_id']),
+        "cliente_nombre": session.get('nombre', 'Cliente'),
+        "productos": productos_pedido,
+        "total": total_pedido,
+        "fecha_emision": fecha_actual
+    }
+    db.tickets.insert_one(nuevo_ticket)
 
     session['carrito'] = {}
     session.modified = True
-    flash('¡Pago procesado con éxito! Tu pedido ha sido enviado a preparación.', 'success')
-    return redirect(url_for('ver_productos'))
+    flash('¡Pago procesado con éxito! Tu pedido ha sido enviado a preparación. Revisa tu ticket en tu perfil.', 'success')
+    return redirect(url_for('perfil'))
 
 # ------------------------------------------------------------------
 # RUTAS DE CLIENTE
@@ -345,6 +396,13 @@ def perfil():
         c['id'] = str(c['_id'])
         citas.append(c)
 
+    # Obtener tickets del usuario
+    tickets_raw = list(db.tickets.find({"usuario_id": usuario_id}).sort("fecha_emision", -1))
+    tickets = []
+    for t in tickets_raw:
+        t['id'] = str(t['_id'])
+        tickets.append(t)
+
     try:
         obj_id = ObjectId(usuario_id)
     except Exception:
@@ -352,7 +410,7 @@ def perfil():
 
     usuario_info = db.usuarios.find_one({"$or": [{"_id": obj_id}, {"_id": usuario_id}]})
 
-    return render_template('perfil.html', usuario=usuario_info, ficha_medica=ficha, citas=citas)
+    return render_template('perfil.html', usuario=usuario_info, ficha_medica=ficha, citas=citas, tickets=tickets)
 
 @app.route('/agendar', methods=['GET', 'POST'])
 @login_required
@@ -458,10 +516,15 @@ def admin_panel():
         catalogo = []
         productos = []
         pedidos = []
-        especialistas = [] # <-- NUEVO
+        especialistas = []
+        tickets = [] # <-- NUEVO
 
         try:
-            # Cargar especialistas
+            # Cargar tickets para el admin
+            for t in db.tickets.find({}).sort("fecha_emision", -1):
+                t['id'] = str(t['_id'])
+                tickets.append(t)
+
             for esp in db.especialistas.find({}):
                 esp['id'] = str(esp['_id'])
                 especialistas.append(esp)
@@ -484,7 +547,6 @@ def admin_panel():
                     except Exception:
                         pass
                 
-                # Buscar el especialista de la cita
                 esp_cita = None
                 esp_id = c.get("especialista_id")
                 if esp_id:
@@ -502,7 +564,7 @@ def admin_panel():
                     "telefono": u.get("telefono", "") if u else "",
                     "servicio_nombre": s["nombre"] if s and "nombre" in s else "Servicio",
                     "especialista_nombre": esp_cita["nombre"] if esp_cita and "nombre" in esp_cita else "Cualquiera",
-                    "notas_cliente": c.get("notas_cliente", "Sin notas") # <-- NUEVO
+                    "notas_cliente": c.get("notas_cliente", "Sin notas")
                 })
         except Exception as e:
             print(f"Error procesando citas: {e}")
@@ -528,13 +590,12 @@ def admin_panel():
         except Exception as e:
             print(f"Error procesando pedidos: {e}")
 
-        return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos, especialistas=especialistas)
+        return render_template('admin.html', citas=citas, catalogo=catalogo, productos=productos, pedidos=pedidos, especialistas=especialistas, tickets=tickets)
     
     except Exception as e:
         error_msg = traceback.format_exc()
         return f"<h3>Ocurrió un error en el servidor (500):</h3><pre>{error_msg}</pre>", 500
 
-# --- RUTAS DE ESPECIALISTAS (NUEVAS) ---
 @app.route('/admin/especialista/nuevo', methods=['POST'])
 @admin_required
 def agregar_especialista():
@@ -567,7 +628,6 @@ def cambiar_estado_especialista(especialista_id):
     except Exception:
         pass
     return redirect(url_for('admin_panel'))
-# ---------------------------------------
 
 @app.route('/admin/pedido/estado/<pedido_id>/<estado>')
 @admin_required
@@ -659,12 +719,13 @@ def agregar_producto():
         precio, stock = 0.0, 0
 
     if nombre:
+        estado_activo = 1 if stock > 0 else 0
         nuevo_prod = {
             "nombre": nombre,
             "descripcion": descripcion,
             "precio": precio,
             "stock": stock,
-            "activo": 1,
+            "activo": estado_activo,
             "imagen_url": imagen_url if imagen_url else "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=600&q=80"
         }
         db.productos.insert_one(nuevo_prod)
@@ -684,9 +745,17 @@ def editar_producto(producto_id):
         precio, stock = 0.0, 0
 
     try:
+        nuevo_estado = 1 if stock > 0 else 0
         db.productos.update_one(
             {"_id": ObjectId(producto_id)},
-            {"$set": {"nombre": nombre, "descripcion": descripcion, "precio": precio, "stock": stock, "imagen_url": imagen_url}}
+            {"$set": {
+                "nombre": nombre, 
+                "descripcion": descripcion, 
+                "precio": precio, 
+                "stock": stock, 
+                "imagen_url": imagen_url,
+                "activo": nuevo_estado
+            }}
         )
         flash('Producto actualizado con éxito.', 'success')
     except Exception:
