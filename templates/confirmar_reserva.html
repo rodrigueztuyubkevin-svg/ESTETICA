@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <div class="card shadow border-0 rounded-4 p-5">
+                <h2 class="fw-bold mb-3 text-dark"><i class="bi bi-clock-history text-warning"></i> Confirma tu Horario</h2>
+                <p class="fs-5 text-muted">Estás a un paso de agendar tu cita para el <br><strong>{{ horario.fecha }} a las {{ horario.hora }}</strong>.</p>
+                
+                <div class="alert alert-warning fw-bold fs-3 mt-4 mb-4" role="alert">
+                    Tiempo restante: <span id="contador">05:00</span>
+                </div>
+
+                <form method="POST">
+                    <div class="mb-4 text-start">
+                        <label class="form-label fw-semibold">Notas adicionales (opcional):</label>
+                        <textarea class="form-control rounded-3" name="notas" rows="3" placeholder="Ej. Tengo piel sensible..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100 py-3 rounded-pill fw-bold fs-5 mb-2">Confirmar Cita Definitiva</button>
+                </form>
+                
+                <a href="{{ url_for('cancelar_reserva', horario_id=horario._id) }}" class="btn btn-outline-danger w-100 py-2 rounded-pill">Cancelar y Liberar Horario</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lógica del Contador (Frontend) -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const salida = document.getElementById("contador");
+        // Jinja envía la fecha en formato ISO. La pasamos a milisegundos.
+        const limite = new Date("{{ horario.vence_en.isoformat() }}").getTime();
+
+        const actualizarContador = () => {
+            const faltan = Math.max(0, limite - Date.now());
+            const segundosTotales = Math.floor(faltan / 1000);
+            
+            const minutos = Math.floor(segundosTotales / 60);
+            const segundos = segundosTotales % 60;
+            
+            salida.textContent = `${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
+
+            if (faltan <= 0) {
+                salida.textContent = "00:00";
+                salida.classList.remove('text-dark');
+                salida.classList.add('text-danger');
+                setTimeout(() => {
+                    window.location.href = "{{ url_for('agendar') }}"; // Redirigir al expirar
+                }, 2000);
+            }
+        };
+
+        actualizarContador();
+        setInterval(actualizarContador, 1000);
+    });
+</script>
+{% endblock %}

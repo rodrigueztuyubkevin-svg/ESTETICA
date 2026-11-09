@@ -1,11 +1,12 @@
 import os
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from pymongo import MongoClient, ReturnDocument
 from bson.objectid import ObjectId
 import traceback
+import uuid
 import random
 import string
 
@@ -19,10 +20,30 @@ mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/estetica_db")
 client = MongoClient(mongo_uri)
 db = client.get_database("lumina_studio_db")
 
+DURACION_RESERVA_MINUTOS = 5
+
+def ahora_utc():
+    return datetime.now(timezone.utc)
+
+def obtener_reserva_id():
+    if not session.get("reserva_id"):
+        session["reserva_id"] = uuid.uuid4().hex
+    return session["reserva_id"]
+
 def init_db():
     try:
         db.servicios.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}, {"precio": {"$exists": False}}]})
         db.productos.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}]})
+
+        # Crear índice único para evitar horarios duplicados (Reserva Temporal)
+        try:
+            db.horarios.create_index(
+                [("especialista_id", 1), ("fecha", 1), ("hora", 1)],
+                unique=True,
+                name="horario_unico"
+            )
+        except Exception as e:
+            print("Índice ya creado o error:", e)
 
         if db.servicios.count_documents({}) == 0:
             servicios_iniciales = [
@@ -317,7 +338,7 @@ def pagar_carrito():
 
     fecha_actual = datetime.now()
     
-    # 1. Crear el pedido
+    # Crear el pedido
     nuevo_pedido = {
         "usuario_id": str(session['usuario_id']),
         "cliente_nombre": session.get('nombre', 'Cliente'),
@@ -328,7 +349,7 @@ def pagar_carrito():
     }
     resultado_pedido = db.pedidos.insert_one(nuevo_pedido)
     
-    # 2. Crear el ticket (NUEVO)
+    # Crear el ticket
     nuevo_ticket = {
         "folio": generar_folio_ticket(),
         "pedido_id": str(resultado_pedido.inserted_id),
@@ -450,59 +471,126 @@ def agendar():
             return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, hoy=hoy, servicios=servicios, especialistas=especialistas)
         
         elif paso == '3':
-            servicio_id = request.form.get('servicio_id')
-            especialista_id = request.form.get('especialista_id')
-            fecha = request.form.get('fecha')
-            hora = request.form.get('hora')
-            
-            if not fecha or not hora:
-                flash('Por favor selecciona una fecha y hora válidas.', 'warning')
-                hoy = date.today().strftime('%Y-%m-%d')
-                return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, hoy=hoy, servicios=servicios, especialistas=especialistas)
-            
-            try:
-                srv = db.servicios.find_one({"_id": ObjectId(servicio_id)})
-            except Exception:
-                srv = None
-
-            if srv:
-                srv['id'] = str(srv['_id'])
-
-            return render_template('agendar.html', paso=4, servicio_id=servicio_id, especialista_id=especialista_id, fecha=fecha, hora=hora, servicio_info=srv, servicios=servicios, especialistas=especialistas)
-
-        elif paso == '4':
-            servicio_id = request.form.get('servicio_id')
-            especialista_id = request.form.get('especialista_id')
-            fecha = request.form.get('fecha')
-            hora = request.form.get('hora')
-            notas = request.form.get('notas', '')
-
-            fecha_hora = f"{fecha} {hora}"
-            
-            try:
-                serv_obj_id = ObjectId(servicio_id)
-            except Exception:
-                serv_obj_id = servicio_id
-
-            try:
-                esp_obj_id = ObjectId(especialista_id) if especialista_id and especialista_id != '0' else None
-            except Exception:
-                esp_obj_id = None
-
-            nueva_cita = {
-                "usuario_id": str(session['usuario_id']),
-                "servicio_id": serv_obj_id,
-                "especialista_id": esp_obj_id,
-                "fecha_hora": fecha_hora,
-                "notas_cliente": notas,
-                "estado": "confirmada"
-            }
-
-            db.citas.insert_one(nueva_cita)
-            flash('¡Tu cita ha sido agendada con éxito!', 'success')
-            return redirect(url_for('perfil'))
+            # Aquí redirigimos a la ruta de reserva temporal
+            return redirect(url_for('reservar_horario'))
 
     return render_template('agendar.html', servicios=servicios, especialistas=especialistas, paso=1)
+
+# ------------------------------------------------------------------
+# RESERVA TEMPORAL (NUEVO)
+# ------------------------------------------------------------------
+
+@app.route('/reservar_horario', methods=['POST'])
+@login_required
+def reservar_horario():
+    especialista_id = request.form.get('especialista_id')
+    fecha = request.form.get('fecha')
+    hora = request.form.get('hora')
+    servicio_id = request.form.get('servicio_id')
+
+    if not (fecha and hora):
+        flash('Faltan datos para reservar.', 'danger')
+        return redirect(url_for('agendar'))
+
+    esp_obj_id = ObjectId(especialista_id) if especialista_id and especialista_id != '0' else None
+
+    try:
+        nuevo_horario = {
+            "especialista_id": esp_obj_id,
+            "fecha": fecha,
+            "hora": hora,
+            "estado": "reservado",
+            "reserva_id": obtener_reserva_id(),
+            "usuario_id": session['usuario_id'],
+            "servicio_id": ObjectId(servicio_id),
+            "vence_en": ahora_utc() + timedelta(minutes=DURACION_RESERVA_MINUTOS)
+        }
+        
+        resultado = db.horarios.insert_one(nuevo_horario)
+        flash('¡Horario apartado por 5 minutos! Por favor, confirma tu cita.', 'success')
+        return redirect(url_for('confirmar_reserva', horario_id=str(resultado.inserted_id)))
+        
+    except Exception as e:
+        if "duplicate key error" in str(e).lower():
+            horario_existente = db.horarios.find_one({
+                "especialista_id": esp_obj_id,
+                "fecha": fecha,
+                "hora": hora,
+                "vence_en": {"$lte": ahora_utc()}
+            })
+            
+            if horario_existente:
+                db.horarios.update_one(
+                    {"_id": horario_existente["_id"]},
+                    {"$set": {
+                        "reserva_id": obtener_reserva_id(),
+                        "usuario_id": session['usuario_id'],
+                        "servicio_id": ObjectId(servicio_id),
+                        "vence_en": ahora_utc() + timedelta(minutes=DURACION_RESERVA_MINUTOS)
+                    }}
+                )
+                flash('El horario anterior venció. ¡Lo hemos apartado para ti!', 'success')
+                return redirect(url_for('confirmar_reserva', horario_id=str(horario_existente["_id"])))
+            else:
+                flash('Lo sentimos, otra persona acaba de apartar este horario. Elige otro.', 'danger')
+                return redirect(url_for('agendar'))
+        else:
+            print(f"Error al reservar: {e}")
+            flash('Ocurrió un error al procesar tu reserva.', 'danger')
+            return redirect(url_for('agendar'))
+
+@app.route('/confirmar_reserva/<horario_id>', methods=['GET', 'POST'])
+@login_required
+def confirmar_reserva(horario_id):
+    horario = db.horarios.find_one({
+        "_id": ObjectId(horario_id),
+        "reserva_id": obtener_reserva_id()
+    })
+    
+    if not horario:
+        flash('La reserva no existe o no te pertenece.', 'danger')
+        return redirect(url_for('agendar'))
+        
+    if horario['vence_en'] <= ahora_utc():
+        flash('Tu tiempo de reserva ha expirado. El horario se ha liberado.', 'warning')
+        db.horarios.delete_one({"_id": horario["_id"]})
+        return redirect(url_for('agendar'))
+
+    if request.method == 'POST':
+        notas = request.form.get('notas', '')
+        fecha_hora = f"{horario['fecha']} {horario['hora']}"
+        
+        nueva_cita = {
+            "usuario_id": str(session['usuario_id']),
+            "servicio_id": horario['servicio_id'],
+            "especialista_id": horario['especialista_id'],
+            "fecha_hora": fecha_hora,
+            "notas_cliente": notas,
+            "estado": "confirmada"
+        }
+        db.citas.insert_one(nueva_cita)
+        
+        db.horarios.delete_one({"_id": horario["_id"]})
+        
+        flash('¡Tu cita ha sido confirmada con éxito!', 'success')
+        return redirect(url_for('perfil'))
+
+    return render_template('confirmar_reserva.html', horario=horario)
+
+@app.route('/cancelar_reserva/<horario_id>')
+@login_required
+def cancelar_reserva(horario_id):
+    resultado = db.horarios.delete_one({
+        "_id": ObjectId(horario_id),
+        "reserva_id": obtener_reserva_id()
+    })
+    
+    if resultado.deleted_count > 0:
+        flash('Reserva cancelada. El horario está libre de nuevo.', 'info')
+    else:
+        flash('No se pudo cancelar la reserva.', 'danger')
+        
+    return redirect(url_for('agendar'))
 
 # ------------------------------------------------------------------
 # PANEL DE ADMINISTRACIÓN
@@ -517,10 +605,9 @@ def admin_panel():
         productos = []
         pedidos = []
         especialistas = []
-        tickets = [] # <-- NUEVO
+        tickets = []
 
         try:
-            # Cargar tickets para el admin
             for t in db.tickets.find({}).sort("fecha_emision", -1):
                 t['id'] = str(t['_id'])
                 tickets.append(t)
