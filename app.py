@@ -23,7 +23,8 @@ db = client.get_database("lumina_studio_db")
 DURACION_RESERVA_MINUTOS = 5
 
 def ahora_utc():
-    return datetime.now(timezone.utc)
+    # Retornamos la fecha sin zona horaria para que coincida con lo que guarda MongoDB
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def obtener_reserva_id():
     if not session.get("reserva_id"):
@@ -35,7 +36,7 @@ def init_db():
         db.servicios.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}, {"precio": {"$exists": False}}]})
         db.productos.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}]})
 
-        # Crear índice único para evitar horarios duplicados (Reserva Temporal)
+        # Crear índice único para evitar horarios duplicados
         try:
             db.horarios.create_index(
                 [("especialista_id", 1), ("fecha", 1), ("hora", 1)],
@@ -80,8 +81,8 @@ def init_db():
                 }
             ]
             db.productos.insert_many(productos_iniciales)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Error en init_db: {e}")
 
 with app.app_context():
     init_db()
@@ -338,7 +339,6 @@ def pagar_carrito():
 
     fecha_actual = datetime.now()
     
-    # Crear el pedido
     nuevo_pedido = {
         "usuario_id": str(session['usuario_id']),
         "cliente_nombre": session.get('nombre', 'Cliente'),
@@ -349,7 +349,6 @@ def pagar_carrito():
     }
     resultado_pedido = db.pedidos.insert_one(nuevo_pedido)
     
-    # Crear el ticket
     nuevo_ticket = {
         "folio": generar_folio_ticket(),
         "pedido_id": str(resultado_pedido.inserted_id),
@@ -417,7 +416,6 @@ def perfil():
         c['id'] = str(c['_id'])
         citas.append(c)
 
-    # Obtener tickets del usuario
     tickets_raw = list(db.tickets.find({"usuario_id": usuario_id}).sort("fecha_emision", -1))
     tickets = []
     for t in tickets_raw:
@@ -471,13 +469,12 @@ def agendar():
             return render_template('agendar.html', paso=3, servicio_id=servicio_id, especialista_id=especialista_id, hoy=hoy, servicios=servicios, especialistas=especialistas)
         
         elif paso == '3':
-            # Aquí redirigimos a la ruta de reserva temporal
             return redirect(url_for('reservar_horario'))
 
     return render_template('agendar.html', servicios=servicios, especialistas=especialistas, paso=1)
 
 # ------------------------------------------------------------------
-# RESERVA TEMPORAL (NUEVO)
+# RESERVA TEMPORAL
 # ------------------------------------------------------------------
 
 @app.route('/reservar_horario', methods=['POST'])
