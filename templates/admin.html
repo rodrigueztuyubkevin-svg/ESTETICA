@@ -20,7 +20,7 @@
         </div>
     </div>
 
-    <!-- SECCIÓN: PEDIDOS DE CLIENTES -->
+    <!-- ===================== PEDIDOS ===================== -->
     <div class="row mb-5">
         <div class="col-12">
             <div class="card admin-card p-4 p-md-5 border-start border-success border-4">
@@ -92,7 +92,7 @@
         </div>
     </div>
 
-    <!-- SECCIÓN CITAS DE USUARIOS -->
+    <!-- ===================== CITAS ===================== -->
     <div class="row mb-5">
         <div class="col-12">
             <div class="card admin-card p-4 p-md-5">
@@ -129,28 +129,6 @@
                                         </div>
                                     </td>
                                 </tr>
-
-                                <div class="modal fade" id="detalleCita{{ cita.id }}" tabindex="-1">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content rounded-4 p-3">
-                                            <div class="modal-header border-0">
-                                                <h5 class="fw-bold"><i class="bi bi-journal-medical me-2"></i>Detalles de la Cita</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body text-start">
-                                                <p><strong>Cliente:</strong> {{ cita.cliente_nombre }}</p>
-                                                <p><strong>Servicio:</strong> {{ cita.servicio_nombre }}</p>
-                                                <p><strong>Especialista:</strong> {{ cita.especialista_nombre }}</p>
-                                                <p><strong>Fecha:</strong> {{ cita.fecha_hora }}</p>
-                                                <hr>
-                                                <p class="mb-0"><strong><i class="bi bi-chat-left-text me-1"></i>Notas del Cliente:</strong></p>
-                                                <div class="bg-light p-3 rounded-3 mt-2">
-                                                    {{ cita.notas_cliente if cita.notas_cliente else 'El cliente no dejó notas adicionales.' }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -162,7 +140,7 @@
         </div>
     </div>
 
-    <!-- SECCIÓN SERVICIOS -->
+    <!-- ===================== SERVICIOS ===================== -->
     <div class="row g-4 mb-5">
         <div class="col-lg-4">
             <div class="card admin-card p-4 h-100">
@@ -188,7 +166,7 @@
                             <tbody>
                                 {% for s in catalogo %}
                                 <tr>
-                                    <td><img src="{{ s.imagen_url }}" class="rounded-3 object-fit-cover" width="40" height="40" alt="img"></td>
+                                    <td><img src="{{ s.imagen_url }}" class="rounded-3 object-fit-cover" width="40" height="40" alt="img" onerror="this.src='https://via.placeholder.com/40'"></td>
                                     <td class="fw-bold">{{ s.nombre }}</td>
                                     <td>${{ "%.2f"|format(s.precio) }}</td>
                                     <td>{{ s.duracion_min }} min</td>
@@ -200,23 +178,6 @@
                                         </a>
                                     </td>
                                 </tr>
-                                <div class="modal fade" id="editServicio{{ s.id }}" tabindex="-1">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content rounded-4 p-3">
-                                            <div class="modal-header border-0"><h5 class="fw-bold">Editar: {{ s.nombre }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                                            <form action="{{ url_for('editar_servicio', servicio_id=s.id) }}" method="POST">
-                                                <div class="modal-body text-start">
-                                                    <div class="mb-3"><label class="form-label fw-semibold">Nombre</label><input type="text" class="form-control rounded-3" name="nombre" value="{{ s.nombre }}" required></div>
-                                                    <div class="mb-3"><label class="form-label fw-semibold">Descripción</label><textarea class="form-control rounded-3" name="descripcion" rows="2">{{ s.descripcion }}</textarea></div>
-                                                    <div class="mb-3"><label class="form-label fw-semibold">URL de Imagen</label><input type="url" class="form-control rounded-3" name="imagen_url" value="{{ s.imagen_url }}"></div>
-                                                    <div class="mb-3"><label class="form-label fw-semibold">Precio</label><input type="number" step="0.01" class="form-control rounded-3" name="precio" value="{{ s.precio }}" required></div>
-                                                    <div class="mb-3"><label class="form-label fw-semibold">Duración (min)</label><input type="number" class="form-control rounded-3" name="duracion_min" value="{{ s.duracion_min }}" required></div>
-                                                </div>
-                                                <div class="modal-footer border-0"><button type="submit" class="btn btn-dark rounded-pill px-4">Guardar Cambios</button></div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -228,7 +189,7 @@
         </div>
     </div>
 
-    <!-- SECCIÓN ESPECIALISTAS -->
+    <!-- ===================== ESPECIALISTAS ===================== -->
     <div class="row g-4 mb-5">
         <div class="col-lg-4">
             <div class="card admin-card p-4 h-100 border-start border-warning border-4">
@@ -252,7 +213,7 @@
                             <tbody>
                                 {% for esp in especialistas %}
                                 <tr>
-                                    <td><img src="{{ esp.imagen_url }}" class="rounded-circle object-fit-cover" width="40" height="40" alt="img"></td>
+                                    <td><img src="{{ esp.imagen_url }}" class="rounded-circle object-fit-cover" width="40" height="40" alt="img" onerror="this.src='https://via.placeholder.com/40'"></td>
                                     <td class="fw-bold">{{ esp.nombre }}</td>
                                     <td class="text-muted">{{ esp.especialidad }}</td>
                                     <td><span class="badge bg-{{ 'success' if esp.get('activo', 1) == 1 else 'secondary' }}">{{ 'Activo' if esp.get('activo', 1) == 1 else 'Inactivo' }}</span></td>
@@ -273,7 +234,7 @@
         </div>
     </div>
 
-    <!-- SECCIÓN PRODUCTOS -->
+    <!-- ===================== PRODUCTOS ===================== -->
     <div class="row g-4 mb-5">
         <div class="col-lg-4">
             <div class="card admin-card p-4 h-100">
@@ -299,7 +260,7 @@
                             <tbody>
                                 {% for p in productos %}
                                 <tr>
-                                    <td><img src="{{ p.imagen_url }}" class="rounded-3 object-fit-cover" width="40" height="40" alt="img"></td>
+                                    <td><img src="{{ p.imagen_url }}" class="rounded-3 object-fit-cover" width="40" height="40" alt="img" onerror="this.src='https://via.placeholder.com/40'"></td>
                                     <td class="fw-bold">{{ p.nombre }}</td>
                                     <td>${{ "%.2f"|format(p.precio) }}</td>
                                     <td>
@@ -320,26 +281,6 @@
                                         </a>
                                     </td>
                                 </tr>
-                                <div class="modal fade" id="editProd{{ p.id }}" tabindex="-1">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content rounded-4 p-3">
-                                            <div class="modal-header border-0"><h5 class="fw-bold">Editar: {{ p.nombre }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                                            <form action="{{ url_for('editar_producto', producto_id=p.id) }}" method="POST">
-                                                <div class="modal-body text-start">
-                                                    <div class="mb-3"><label class="form-label fw-semibold">Nombre</label><input type="text" class="form-control rounded-3" name="nombre" value="{{ p.nombre }}" required></div>
-                                                    <div class="mb-3"><label class="form-label fw-semibold">Descripción</label><textarea class="form-control rounded-3" name="descripcion" rows="2">{{ p.descripcion }}</textarea></div>
-                                                    <div class="mb-3"><label class="form-label fw-semibold">URL de Imagen</label><input type="url" class="form-control rounded-3" name="imagen_url" value="{{ p.imagen_url }}"></div>
-                                                    <div class="mb-3"><label class="form-label fw-semibold">Precio</label><input type="number" step="0.01" class="form-control rounded-3" name="precio" value="{{ p.precio }}" required></div>
-                                                    <div class="mb-3"><label class="form-label fw-semibold">Stock</label><input type="number" class="form-control rounded-3" name="stock" value="{{ p.stock }}" required></div>
-                                                </div>
-                                                <div class="modal-footer border-0">
-                                                    <p class="text-muted small w-100 text-start mb-2"><i class="bi bi-info-circle me-1"></i>Si el stock es mayor a 0, el producto se activará automáticamente.</p>
-                                                    <button type="submit" class="btn btn-dark rounded-pill px-4">Guardar Cambios</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -351,7 +292,7 @@
         </div>
     </div>
 
-    <!-- SECCIÓN TICKETS (HISTORIAL DE VENTAS) -->
+    <!-- ===================== TICKETS ===================== -->
     <div class="row mt-5">
         <div class="col-12">
             <div class="card admin-card p-4 p-md-5 border-start border-dark border-4">
@@ -403,4 +344,91 @@
 
 </div>
 
+<!-- ===================== MODALES (FUERA DE LAS TABLAS) ===================== -->
+
+<!-- Modales de Detalle de Cita -->
+{% for cita in citas %}
+<div class="modal fade" id="detalleCita{{ cita.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 p-3">
+            <div class="modal-header border-0">
+                <h5 class="fw-bold"><i class="bi bi-journal-medical me-2"></i>Detalles de la Cita</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body text-start">
+                <p><strong>Cliente:</strong> {{ cita.cliente_nombre }}</p>
+                <p><strong>Teléfono:</strong> {{ cita.telefono or 'No registrado' }}</p>
+                <p><strong>Servicio:</strong> {{ cita.servicio_nombre }}</p>
+                <p><strong>Especialista:</strong> {{ cita.especialista_nombre }}</p>
+                <p><strong>Fecha:</strong> {{ cita.fecha_hora }}</p>
+                <p><strong>Estado:</strong> <span class="text-uppercase">{{ cita.estado }}</span></p>
+                <hr>
+                <p class="mb-0"><strong><i class="bi bi-chat-left-text me-1"></i>Notas del Cliente:</strong></p>
+                <div class="bg-light p-3 rounded-3 mt-2">
+                    {{ cita.notas_cliente if cita.notas_cliente else 'El cliente no dejó notas adicionales.' }}
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-dark rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Modales de Edición de Servicio -->
+{% for s in catalogo %}
+<div class="modal fade" id="editServicio{{ s.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 p-3">
+            <div class="modal-header border-0">
+                <h5 class="fw-bold">Editar: {{ s.nombre }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form action="{{ url_for('editar_servicio', servicio_id=s.id) }}" method="POST">
+                <div class="modal-body text-start">
+                    <div class="mb-3"><label class="form-label fw-semibold">Nombre</label><input type="text" class="form-control rounded-3" name="nombre" value="{{ s.nombre }}" required></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Descripción</label><textarea class="form-control rounded-3" name="descripcion" rows="2">{{ s.descripcion }}</textarea></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">URL de Imagen</label><input type="url" class="form-control rounded-3" name="imagen_url" value="{{ s.imagen_url }}"></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Precio</label><input type="number" step="0.01" class="form-control rounded-3" name="precio" value="{{ s.precio }}" required></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Duración (min)</label><input type="number" class="form-control rounded-3" name="duracion_min" value="{{ s.duracion_min }}" required></div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="submit" class="btn btn-dark rounded-pill px-4">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Modales de Edición de Producto -->
+{% for p in productos %}
+<div class="modal fade" id="editProd{{ p.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 p-3">
+            <div class="modal-header border-0">
+                <h5 class="fw-bold">Editar: {{ p.nombre }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form action="{{ url_for('editar_producto', producto_id=p.id) }}" method="POST">
+                <div class="modal-body text-start">
+                    <div class="mb-3"><label class="form-label fw-semibold">Nombre</label><input type="text" class="form-control rounded-3" name="nombre" value="{{ p.nombre }}" required></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Descripción</label><textarea class="form-control rounded-3" name="descripcion" rows="2">{{ p.descripcion }}</textarea></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">URL de Imagen</label><input type="url" class="form-control rounded-3" name="imagen_url" value="{{ p.imagen_url }}"></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Precio</label><input type="number" step="0.01" class="form-control rounded-3" name="precio" value="{{ p.precio }}" required></div>
+                    <div class="mb-3"><label class="form-label fw-semibold">Stock</label><input type="number" class="form-control rounded-3" name="stock" value="{{ p.stock }}" required></div>
+                </div>
+                <div class="modal-footer border-0">
+                    <p class="text-muted small w-100 text-start mb-2"><i class="bi bi-info-circle me-1"></i>Si el stock es mayor a 0, el producto se activará automáticamente.</p>
+                    <button type="submit" class="btn btn-dark rounded-pill px-4">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Bootstrap JS: elimina esta línea si ya la cargas en base.html -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 {% endblock %}
