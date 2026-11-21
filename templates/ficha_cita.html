@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0 rounded-4 p-4 text-center">
+                <h2 class="fw-bold mb-1">KAD Estética & Spa</h2>
+                <p class="text-muted mb-4">Comprobante de cita</p>
+
+                <div class="bg-light rounded-3 p-3 text-start mb-3">
+                    <p class="mb-1"><strong>Folio:</strong> <code>{{ ficha.id[-8:] }}</code></p>
+                    <p class="mb-1"><strong>Servicio:</strong> {{ ficha.servicio_nombre }}</p>
+                    <p class="mb-1"><strong>Especialista:</strong> {{ ficha.especialista_nombre }}</p>
+                    <p class="mb-1"><strong>Fecha y hora:</strong> {{ ficha.fecha_hora }}</p>
+                    <p class="mb-0"><strong>Estado:</strong>
+                        <span class="badge bg-{{ 'success' if ficha.estado == 'confirmada' else ('danger' if ficha.estado == 'cancelada' else ('secondary' if ficha.estado == 'completada' else 'warning text-dark')) }} text-uppercase">
+                            {{ ficha.estado }}
+                        </span>
+                    </p>
+                </div>
+
+                <img src="{{ url_for('qr_cita', cita_id=ficha.id) }}" alt="QR de la cita" class="mx-auto" width="200" height="200">
+                <p class="text-muted small mt-2">Escanea este código para abrir esta misma ficha desde tu celular.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

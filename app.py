@@ -10,6 +10,12 @@ import uuid
 import random
 import string
 
+# === PROYECTO FINAL: imports para QR ===
+import qrcode
+from io import BytesIO
+from flask import send_file
+# === FIN PROYECTO FINAL ===
+
 app = Flask(__name__)
 app.secret_key = 'aura_estetica_secret_key_super_segura'
 
@@ -23,7 +29,6 @@ db = client.get_database("lumina_studio_db")
 DURACION_RESERVA_MINUTOS = 5
 
 def ahora_utc():
-    # Retornamos la fecha sin zona horaria para que coincida con lo que guarda MongoDB
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def obtener_reserva_id():
@@ -31,12 +36,22 @@ def obtener_reserva_id():
         session["reserva_id"] = uuid.uuid4().hex
     return session["reserva_id"]
 
+# === PROYECTO FINAL: limpieza de reservas vencidas ===
+def liberar_reservas_vencidas():
+    """Borra de MongoDB los horarios cuya reserva temporal ya venció."""
+    try:
+        resultado = db.horarios.delete_many({"vence_en": {"$lte": ahora_utc()}})
+        if resultado.deleted_count > 0:
+            print(f"[limpieza] {resultado.deleted_count} reservas vencidas liberadas")
+    except Exception as e:
+        print(f"Error al liberar reservas vencidas: {e}")
+# === FIN PROYECTO FINAL ===
+
 def init_db():
     try:
         db.servicios.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}, {"precio": {"$exists": False}}]})
         db.productos.delete_many({"$or": [{"nombre": {"$exists": False}}, {"nombre": ""}]})
 
-        # Crear índice único para evitar horarios duplicados
         try:
             db.horarios.create_index(
                 [("especialista_id", 1), ("fecha", 1), ("hora", 1)],
@@ -412,7 +427,12 @@ def perfil():
             srv = db.servicios.find_one({"_id": c.get("servicio_id")})
         except Exception:
             srv = None
+        try:
+            esp = db.especialistas.find_one({"_id": c.get("especialista_id")}) if c.get("especialista_id") else None
+        except Exception:
+            esp = None
         c['servicio_nombre'] = srv['nombre'] if srv and 'nombre' in srv else 'Tratamiento Estético'
+        c['especialista_nombre'] = esp['nombre'] if esp and 'nombre' in esp else 'Cualquiera'
         c['id'] = str(c['_id'])
         citas.append(c)
 
@@ -434,6 +454,7 @@ def perfil():
 @app.route('/agendar', methods=['GET', 'POST'])
 @login_required
 def agendar():
+    liberar_reservas_vencidas()   # === PROYECTO FINAL ===
     try:
         servicios_raw = list(db.servicios.find({"activo": 1, "tipo": "servicio"}))
     except Exception:
@@ -480,6 +501,7 @@ def agendar():
 @app.route('/reservar_horario', methods=['POST'])
 @login_required
 def reservar_horario():
+    liberar_reservas_vencidas()   # === PROYECTO FINAL ===
     especialista_id = request.form.get('especialista_id')
     fecha = request.form.get('fecha')
     hora = request.form.get('hora')
@@ -596,6 +618,7 @@ def cancelar_reserva(horario_id):
 @app.route('/admin')
 @admin_required
 def admin_panel():
+    liberar_reservas_vencidas()   # === PROYECTO FINAL ===
     try:
         citas = []
         catalogo = []
@@ -870,6 +893,57 @@ def cambiar_estado_cita(cita_id, estado):
         except Exception:
             flash('No se pudo actualizar la cita.', 'danger')
     return redirect(url_for('admin_panel'))
+
+# ------------------------------------------------------------------
+# FICHA PÚBLICA + CÓDIGO QR (Proyecto Final)
+# ------------------------------------------------------------------
+
+@app.route('/ficha/cita/<cita_id>')
+def ficha_cita(cita_id):
+    """Ficha pública de una cita. No requiere login. La abre el QR."""
+    try:
+        cita = db.citas.find_one({"_id": ObjectId(cita_id)})
+    except Exception:
+        cita = None
+
+    if not cita:
+        return render_template('ficha_404.html'), 404
+
+    servicio = None
+    if cita.get("servicio_id"):
+        try:
+            servicio = db.servicios.find_one({"_id": cita.get("servicio_id")})
+        except Exception:
+            servicio = None
+
+    especialista = None
+    if cita.get("especialista_id"):
+        try:
+            especialista = db.especialistas.find_one({"_id": cita.get("especialista_id")})
+        except Exception:
+            especialista = None
+
+    ficha = {
+        "id": str(cita["_id"]),
+        "estado": cita.get("estado", "pendiente"),
+        "fecha_hora": cita.get("fecha_hora", "Sin fecha"),
+        "servicio_nombre": servicio["nombre"] if servicio and "nombre" in servicio else "Servicio",
+        "especialista_nombre": especialista["nombre"] if especialista and "nombre" in especialista else "Cualquiera",
+    }
+    return render_template('ficha_cita.html', ficha=ficha)
+
+
+@app.route('/qr/cita/<cita_id>.png')
+def qr_cita(cita_id):
+    """Genera el PNG del QR que apunta a la ficha pública."""
+    base = os.environ.get("APP_BASE_URL") or request.host_url.rstrip('/')
+    url_ficha = f"{base}/ficha/cita/{cita_id}"
+
+    img = qrcode.make(url_ficha)
+    buf = BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png')
 
 if __name__ == '__main__':
     app.run(debug=True)

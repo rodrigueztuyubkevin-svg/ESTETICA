@@ -26,12 +26,11 @@
     </div>
 </div>
 
-<!-- Lógica del Contador (Frontend) -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const salida = document.getElementById("contador");
-        // Jinja envía la fecha en formato ISO. La pasamos a milisegundos.
-        const limite = new Date("{{ horario.vence_en.isoformat() }}").getTime();
+        // La "Z" al final fuerza a JavaScript a interpretar la fecha como UTC
+        const limite = new Date("{{ horario.vence_en.isoformat() }}Z").getTime();
 
         const actualizarContador = () => {
             const faltan = Math.max(0, limite - Date.now());
@@ -47,7 +46,7 @@
                 salida.classList.remove('text-dark');
                 salida.classList.add('text-danger');
                 setTimeout(() => {
-                    window.location.href = "{{ url_for('agendar') }}"; // Redirigir al expirar
+                    window.location.href = "{{ url_for('agendar') }}";
                 }, 2000);
             }
         };
